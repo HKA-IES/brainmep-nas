@@ -14,7 +14,8 @@ class TestAccuracyMetrics:
     """
     The calculation of metrics should be very robust in order to avoid wrong
     results and analyzes/conclusions down the line. For this reason, we aim for
-    100% coverage of accuracymetrics.py. Redundancy between tests is not a problem.
+    100% coverage of accuracymetrics.py. Redundancy between tests is not a
+    problem.
 
     The test cases are illustrated in test_accuracymetrics.ods
     """
@@ -151,7 +152,7 @@ class TestAccuracyMetrics:
         sample_offset = 1
 
         am = AccuracyMetrics(y_true, y_pred, sample_duration,
-                               sample_offset, threshold=0.5)
+                             sample_offset, threshold=0.5)
 
         assert am.sample_tp == 17
         assert am.sample_tn == 32
@@ -204,7 +205,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
@@ -212,7 +213,8 @@ class TestAccuracyMetrics:
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
-        for actual, expected in zip(am.events_true_extended, expected_events_true_extended):
+        for actual, expected in zip(am.events_true_extended,
+                                    expected_events_true_extended):
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
@@ -235,7 +237,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=24)
 
@@ -243,7 +245,8 @@ class TestAccuracyMetrics:
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
-        for actual, expected in zip(am.events_true_extended, expected_events_true_extended):
+        for actual, expected in zip(am.events_true_extended,
+                                    expected_events_true_extended):
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
@@ -268,7 +271,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
@@ -294,7 +297,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
@@ -310,7 +313,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
@@ -326,7 +329,7 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
@@ -342,6 +345,58 @@ class TestAccuracyMetrics:
                              sample_duration=4, sample_offset=1,
                              threshold=0.5, event_minimum_overlap=2,
                              event_preictal_tolerance=1,
-                             event_postical_tolerance=2,
+                             event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
+
+    def test_as_dict(self):
+        """
+        Verify that all non-iterable attributes are indeed saved in the dict
+        given by the as_dict() method.
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                           0, 0, 1, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+        y_pred = np.array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           1, 1, 1, 1, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=4, sample_offset=1,
+                             threshold=0.5, event_minimum_overlap=2,
+                             event_preictal_tolerance=1,
+                             event_postictal_tolerance=2,
+                             event_minimum_separation=2,
+                             event_maximum_duration=12)
+
+        expected_dict = {"n_true_seizures": am.n_true_seizures,
+                         "roc_auc": am.roc_auc,
+                         "prc_auc": am.prc_auc,
+                         "threshold_method": am.threshold_method,
+                         "threshold": am.threshold,
+                         "sample_tp": am.sample_tp,
+                         "sample_tn": am.sample_tn,
+                         "sample_fp": am.sample_fp,
+                         "sample_fn": am.sample_fn,
+                         "sample_sensitivity": am.sample_sensitivity,
+                         "sample_specificity": am.sample_specificity,
+                         "sample_precision": am.sample_precision,
+                         "sample_recall": am.sample_recall,
+                         "sample_f_score": am.sample_f_score,
+                         "event_tp": am.event_tp,
+                         "event_fp": am.event_fp,
+                         "event_sensitivity": am.event_sensitivity,
+                         "event_precision": am.event_precision,
+                         "event_recall": am.event_recall,
+                         "event_f_score": am.event_f_score,
+                         "event_false_detections_per_hour": am.event_false_detections_per_hour,
+                         "event_average_detection_delay": am.event_average_detection_delay
+                         }
+
+        assert am.as_dict() == expected_dict

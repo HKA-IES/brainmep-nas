@@ -21,8 +21,6 @@ class AccuracyMetrics:
     labels.
     """
 
-    # TODO: add method to convert to dict.
-
     n_true_seizures: int
     roc_auc: float
     prc_auc: float
@@ -58,7 +56,7 @@ class AccuracyMetrics:
                  threshold: Union[str, float] = 0.5,
                  event_minimum_overlap: float = None,
                  event_preictal_tolerance: float = 30,
-                 event_postical_tolerance: float = 60,
+                 event_postictal_tolerance: float = 60,
                  event_minimum_separation: float = 90,
                  event_maximum_duration: float = 360):
         """
@@ -157,28 +155,31 @@ class AccuracyMetrics:
         self.sample_recall = self.sample_sensitivity
 
         # Event-based metrics
-        # Adapted from https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/scoring.py
+        # Adapted from
+        # https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/scoring.py
         # We create a list of events, where each event is represented by a
         # (start, end) tuple, with the start and end values expressed in
         # seconds from the start of the provided data matrix (i.e. sample 0 in
         # y_pred starts at time 0 seconds).
 
         self.events_true = self._get_events(y_true, sample_duration, sample_offset,
-                                       event_minimum_separation,
-                                       event_maximum_duration)
+                                            event_minimum_separation,
+                                            event_maximum_duration)
         self.events_true_extended = self._extend_events(self.events_true,
-                                                   event_preictal_tolerance,
-                                                   event_postical_tolerance)
-        self.events_pred = self._get_events(y_pred, sample_duration, sample_offset,
-                                       event_minimum_separation,
-                                       event_maximum_duration)
+                                                        event_preictal_tolerance,
+                                                        event_postictal_tolerance)
+        self.events_pred = self._get_events(y_pred, sample_duration,
+                                            sample_offset,
+                                            event_minimum_separation,
+                                            event_maximum_duration)
 
         if event_minimum_overlap is None:
             event_minimum_overlap = 1e-6
 
         self.n_true_seizures = len(self.events_true)
 
-        # True positive if a predicted event partially overlaps with a true event.
+        # True positive if a predicted event partially overlaps with a true
+        # event.
         # Detection delay is the time between the true seizure start
         # (NOT extended) and the predicted detection. The delay is positive if
         # the prediction occurs after the true start, and negative if it occurs
@@ -186,9 +187,8 @@ class AccuracyMetrics:
         self.event_tp = 0
         detection_delays = list()
         for true_event, true_event_extended in zip(self.events_true,
-                                                         self.events_true_extended):
+                                                   self.events_true_extended):
             for pred_event in self.events_pred:
-                # Reference: https://blogs.sas.com/content/sgf/2022/01/13/calculating-the-overlap-of-date-time-intervals/
                 overlap = (min(true_event_extended[1], pred_event[1]) -
                            max(true_event_extended[0], pred_event[0]))
                 if overlap >= event_minimum_overlap:
@@ -197,13 +197,13 @@ class AccuracyMetrics:
                     detection_delays.append(delay)
         self.event_average_detection_delay = np.average(detection_delays)
 
-        # False positive if a predicted event does not overlap with a true event.
+        # False positive if a predicted event does not overlap with a true
+        # event.
         self.event_fp = 0
         for pred_event in self.events_pred:
             overlaps = list()
             for true_event, true_event_extended in zip(self.events_true,
-                                                             self.events_true_extended):
-                # Reference: https://blogs.sas.com/content/sgf/2022/01/13/calculating-the-overlap-of-date-time-intervals/
+                                                       self.events_true_extended):
                 overlap = (min(true_event_extended[1], pred_event[1]) -
                            max(true_event_extended[0], pred_event[0]))
                 overlaps.append(overlap)
@@ -231,15 +231,50 @@ class AccuracyMetrics:
         total_duration = (len(y_true) - 1) * sample_offset + sample_duration
         self.event_false_detections_per_hour = self.event_fp / total_duration * 3600
 
+    def as_dict(self) -> dict:
+        """
+        Returns all non-iterable attributes in a dictionary with attribute
+        names as keys. The dict can be used to save attributes to csv, for
+        example.
+        """
+        d = {"n_true_seizures": self.n_true_seizures,
+             "roc_auc": self.roc_auc,
+             "prc_auc": self.prc_auc,
+             "threshold_method": self.threshold_method,
+             "threshold": self.threshold,
+             "sample_tp": self.sample_tp,
+             "sample_tn": self.sample_tn,
+             "sample_fp": self.sample_fp,
+             "sample_fn": self.sample_fn,
+             "sample_sensitivity": self.sample_sensitivity,
+             "sample_specificity": self.sample_specificity,
+             "sample_precision": self.sample_precision,
+             "sample_recall": self.sample_recall,
+             "sample_f_score": self.sample_f_score,
+             "event_tp": self.event_tp,
+             "event_fp": self.event_fp,
+             "event_sensitivity": self.event_sensitivity,
+             "event_precision": self.event_precision,
+             "event_recall": self.event_recall,
+             "event_f_score": self.event_f_score,
+             "event_false_detections_per_hour": self.event_false_detections_per_hour,
+             "event_average_detection_delay": self.event_average_detection_delay
+             }
+
+        return d
+
     @staticmethod
     def _get_events(y: np.ndarray,
                     sample_duration: float, sample_offset: float,
-                    event_minimum_separation: float, event_maximum_duration: float) -> List[Tuple[float, float]]:
+                    event_minimum_separation: float,
+                    event_maximum_duration: float) -> List[Tuple[float, float]]:
         """
         From a given binary array where 1 represent a sample with seizure
-        detection, create a list of (start, end) tuples for every seizure event.
+        detection, create a list of (start, end) tuples for every seizure
+        event.
 
-        The code is adapted from https://github.com/esl-epfl/sz-validation-framework.
+        The code is adapted from
+        https://github.com/esl-epfl/sz-validation-framework.
 
         :param y: array of seizure labels. Expected values are either 0
         (no seizure) or 1 (seizure).
@@ -253,15 +288,18 @@ class AccuracyMetrics:
         duration. This is done after the merging of close events (see
         event_minimum_separation).
         """
-        # Adapted from https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/annotations.py
+        # Adapted from
+        # https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/annotations.py
         events = list()
         tmpEnd = []
         start_i = np.where(np.diff(np.array(y, dtype=int)) == 1)[0]
         end_i = np.where(np.diff(np.array(y, dtype=int)) == -1)[0]
 
-        # No transitions and first sample is positive -> event is duration of file
+        # No transitions and first sample is positive -> event is duration of
+        # file
         if len(start_i) == 0 and len(end_i) == 0 and y[0]:
-            events.append((0, ((len(y) - 1) * sample_offset) + sample_duration))
+            events.append((0,
+                           ((len(y) - 1) * sample_offset) + sample_duration))
         else:
             # Edge effect - First sample is an event
             if y[0]:
@@ -300,8 +338,8 @@ class AccuracyMetrics:
 
         for i, event in enumerate(shorter_events):
             if event[1] - event[0] > event_maximum_duration:
-                shorter_events[i] = (
-                event[0], event[0] + event_maximum_duration)
+                shorter_events[i] = (event[0],
+                                     event[0] + event_maximum_duration)
                 shorter_events.insert(i + 1,
                                       (event[0] + event_maximum_duration,
                                        event[1]))
@@ -309,7 +347,8 @@ class AccuracyMetrics:
         return shorter_events
 
     @staticmethod
-    def _extend_events(events: List[tuple], preictal: float, postictal: float) -> List[Tuple[float, float]]:
+    def _extend_events(events: List[tuple], preictal: float,
+                       postictal: float) -> List[Tuple[float, float]]:
         """
         Extend events in the pre- and post-ictal directions.
 
