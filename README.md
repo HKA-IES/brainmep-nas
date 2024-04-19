@@ -1,3 +1,3 @@
-# BrainMEP NAS - PUBLIC
+# BrainMEP NAS - PUBLIC REPO
 
 [...]
