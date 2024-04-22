@@ -69,7 +69,7 @@ class AccuracyMetrics:
         of the sz-validation-framework package, available on Github:
         https://github.com/esl-epfl/sz-validation-framework
 
-        A future goal is to eventually integrate the scoring module of
+        A future goal is to formally integrate the scoring module of
         sz-validation-framework in this class.
 
         Reference:
@@ -162,7 +162,8 @@ class AccuracyMetrics:
         # seconds from the start of the provided data matrix (i.e. sample 0 in
         # y_pred starts at time 0 seconds).
 
-        self.events_true = self._get_events(y_true, sample_duration, sample_offset,
+        self.events_true = self._get_events(y_true, sample_duration,
+                                            sample_offset,
                                             event_minimum_separation,
                                             event_maximum_duration)
         self.events_true_extended = self._extend_events(self.events_true,
