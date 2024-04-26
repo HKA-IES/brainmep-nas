@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 
 # import your own module
-from brainmepnas.accuracymetrics import AccuracyMetrics
+from brainmepnas import AccuracyMetrics
 
 
 class TestAccuracyMetrics:
