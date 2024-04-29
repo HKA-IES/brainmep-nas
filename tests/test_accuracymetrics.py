@@ -130,6 +130,36 @@ class TestAccuracyMetrics:
             AccuracyMetrics(y_true, y_pred, sample_duration=1, sample_offset=1,
                             threshold=-1)
 
+    def test_general_attributes(self):
+        """
+        Verify that the general attributes are correct.
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        y_pred = np.array([0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 1, 1, 1, 0, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 0, 1, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 1, 0, 1, 0, 0])
+
+        sample_duration = 1
+        sample_offset = 1
+
+        am = AccuracyMetrics(y_true, y_pred, sample_duration,
+                             sample_offset, threshold=0.5)
+
+        assert am.n_true_seizures == 1
+        assert .0 < am.roc_auc < 1.
+        assert .0 < am.prc_auc < 1.
+        assert am.sample_duration == pytest.approx(1.)
+        assert am.sample_offset == pytest.approx(1.)
+        assert am.total_duration == pytest.approx(1.0*60)
+        assert am.n_samples == 60
 
     def test_sample_metrics(self):
         """
