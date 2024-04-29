@@ -26,6 +26,10 @@ class AccuracyMetrics:
     prc_auc: float
     threshold_method: str   # "fixed" or "max_f_score"
     threshold: float
+    sample_duration: float    # in seconds
+    sample_offset: float    # between two consecutive windows, in seconds
+    total_duration: float   # in seconds
+    n_samples: int
 
     # Sample-based metrics
     sample_tp: int
@@ -110,6 +114,12 @@ class AccuracyMetrics:
         duration. This is done after the merging of close events (see
         event_minimum_separation). Default is 300 seconds (as in [1]).
         """
+        self.sample_duration = sample_duration
+        self.sample_offset = sample_offset
+        self.n_samples = len(y_true)
+        self.total_duration = ((self.n_samples - 1) * self.sample_offset +
+                               self.sample_duration)
+
         # ROC curve
         roc_fpr, roc_tpr, _ = sk_metrics.roc_curve(y_true, y_pred)
         self.roc_auc = sk_metrics.auc(roc_fpr, roc_tpr)
@@ -226,11 +236,14 @@ class AccuracyMetrics:
             self.event_precision = np.nan
             self.event_f_score = np.nan
         else:
-            self.event_precision = self.event_tp / (self.event_tp + self.event_fp)
-            self.event_f_score = (2 * (self.event_precision * self.event_recall) /
+            self.event_precision = (self.event_tp /
+                                    (self.event_tp + self.event_fp))
+            self.event_f_score = (2 *
+                                  (self.event_precision * self.event_recall) /
                                   (self.event_precision + self.event_recall))
         total_duration = (len(y_true) - 1) * sample_offset + sample_duration
-        self.event_false_detections_per_hour = self.event_fp / total_duration * 3600
+        self.event_false_detections_per_hour = ((self.event_fp / total_duration)
+                                                * 3600)
 
     def as_dict(self) -> dict:
         """
