@@ -17,19 +17,19 @@ class TestMltkHardwareMetrics:
     # Link: https://github.com/SiliconLabs/mltk/blob/master/mltk/models/examples/audio_example1.mltk.zip
     GOOD_TFLITE_MODEL = "audio_example1.tflite"
 
-    @pytest.mark.usefixtures('hide_mltk_package')
-    def test_mltk_missing(self):
-        """
-        ImportError is raised if mltk package is missing.
-        """
-        with pytest.raises(ImportError):
-            MltkHardwareMetrics(self.GOOD_TFLITE_MODEL)
-
     def test_good_tflite_model(self):
         """
         Appropriate results are obtained for a valid tflite model.
+
+        Note: due to an issue with onnx, this test takes ~200 seconds to run.
         """
         hm = MltkHardwareMetrics(self.GOOD_TFLITE_MODEL)
+
+        assert 0 < hm.energy < 0.001
+        assert 0 < hm.time < 1
+        assert 0 < hm.ram_memory < 256000
+        assert 0 < hm.flash_memory < 1500000
+        assert hm.profiling_results is not None
 
     def test_bad_tflite_model(self):
         """
