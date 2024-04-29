@@ -3,6 +3,7 @@
 # import built-in module
 import dataclasses
 from typing import Union, List, Tuple
+import numbers
 
 # import third-party modules
 import sklearn.metrics as sk_metrics
@@ -251,29 +252,12 @@ class AccuracyMetrics:
         names as keys. The dict can be used to save attributes to csv, for
         example.
         """
-        d = {"n_true_seizures": self.n_true_seizures,
-             "roc_auc": self.roc_auc,
-             "prc_auc": self.prc_auc,
-             "threshold_method": self.threshold_method,
-             "threshold": self.threshold,
-             "sample_tp": self.sample_tp,
-             "sample_tn": self.sample_tn,
-             "sample_fp": self.sample_fp,
-             "sample_fn": self.sample_fn,
-             "sample_sensitivity": self.sample_sensitivity,
-             "sample_specificity": self.sample_specificity,
-             "sample_precision": self.sample_precision,
-             "sample_recall": self.sample_recall,
-             "sample_f_score": self.sample_f_score,
-             "event_tp": self.event_tp,
-             "event_fp": self.event_fp,
-             "event_sensitivity": self.event_sensitivity,
-             "event_precision": self.event_precision,
-             "event_recall": self.event_recall,
-             "event_f_score": self.event_f_score,
-             "event_false_detections_per_hour": self.event_false_detections_per_hour,
-             "event_average_detection_delay": self.event_average_detection_delay
-             }
+        d = {}
+
+        for field in dataclasses.fields(self):
+            field_value = getattr(self, field.name)
+            if isinstance(field_value, (str, bool, numbers.Number)):
+                d[field.name] = field_value
 
         return d
 
