@@ -2,6 +2,7 @@
 
 # import built-in module
 import dataclasses
+import numbers
 
 # import third-party modules
 
@@ -25,10 +26,11 @@ class HardwareMetrics:
         names as keys. The dict can be used to save attributes to csv, for
         example.
         """
-        d = {"energy": self.energy,
-             "time": self.time,
-             "ram_memory": self.ram_memory,
-             "flash_memory": self.flash_memory
-             }
+        d = {}
+
+        for field in dataclasses.fields(self):
+            field_value = getattr(self, field.name)
+            if isinstance(field_value, (str, bool, numbers.Number)):
+                d[field.name] = field_value
 
         return d
