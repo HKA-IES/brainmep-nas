@@ -1,5 +1,7 @@
 # BrainMEP NAS - PUBLIC REPO
 
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+
 This repository contains the public code used for the NAS process for the
 Brain-MEP Project.
 
