@@ -84,7 +84,7 @@ class AccuracyMetrics:
         [Online]. Available: http://arxiv.org/abs/2402.13005
 
         :param y_true: array of true labels. Expected values are either 0
-        (no seizure) or (seizure).
+        (no seizure) or 1 (seizure).
         :param y_pred: array of predicted labels. Expected values between 0 and
         1.
         :param threshold: either a fixed threshold or one of the following:
