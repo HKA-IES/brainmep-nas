@@ -1,1 +1,2 @@
 from ._mltk import MltkHardwareMetrics
+from ._remote_testbench import TestbenchHardwareMetrics
