@@ -20,9 +20,12 @@ class MltkHardwareMetrics(HardwareMetrics):
     """
     Store hardware metrics given by the Silicon Labs Machine Learning Toolkit
     (MLTK).
+
+    Requires the optional dependency "silabs-mltk[full]". Install it by
+    executing '$ pip install silabs-mltk[full]'.
     """
 
-    profiling_results: ProfilingModelResults
+    profiling_results: "ProfilingModelResults"
 
     def __init__(self, tflite_model_path: str):
         """
@@ -37,7 +40,7 @@ class MltkHardwareMetrics(HardwareMetrics):
         if not _has_mltk:
             raise ImportError("The mltk package is required to use this class."
                               " Install it by executing "
-                              "'$ pip install silabs-mltk'.",
+                              "'$ pip install silabs-mltk[full]'.",
                               name="silabs-mltk")
 
         self.profiling_results = profile_model(tflite_model_path,
