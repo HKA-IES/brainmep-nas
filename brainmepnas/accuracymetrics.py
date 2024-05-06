@@ -88,11 +88,11 @@ class AccuracyMetrics:
         detection algorithms.” arXiv, Feb. 23, 2024. Accessed: Feb. 27, 2024.
         [Online]. Available: http://arxiv.org/abs/2402.13005
 
-        Parameters                                                                                                  # I tried to increase readability
+        Parameters                                                                                                  
         ----------
-        y_true : int                                                                                                   changed to int
-          Array of true labels. Expected values are either 0 (no seizure) or 1 (seizure).                              # added '1' here
-        y_pred : int 
+        y_true : int                                                                                                  
+          Array of true labels. Expected values are either 0 (no seizure) or 1 (seizure).                              
+        y_pred : float 
             Array of predicted labels. Expected values between 0 and 1.
         threshold : str or float
             The threshold to apply. Either a fixed (float) threshold or 
@@ -101,7 +101,7 @@ class AccuracyMetrics:
             Duration of a sample (signal window) in seconds.
         sample_offset : float
             Duration between the start of two consecutive
-            samples in seconds. For example, samples with a duration of 4 seconds                                   ## i think stride is more commonly used
+            samples in seconds. For example, samples with a duration of 4 seconds                                   
             and a stride of 1 second would have the following start and stop
             times:
                 sample 0: 0s to 4s
