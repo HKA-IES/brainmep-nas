@@ -28,7 +28,7 @@ class AccuracyMetrics:
     prc_auc: float
     threshold_method: str   # "fixed" or "max_f_score"
     threshold: float
-    sample_duration: float    # in seconds
+    sample_duration: float  # in seconds
     sample_offset: float    # between two consecutive windows, in seconds
     total_duration: float   # in seconds
     n_samples: int
@@ -70,7 +70,7 @@ class AccuracyMetrics:
                  event_maximum_duration: float = 360):
         """
         Calculate sample- and event-based accuracy metrics from arrays of
-        predicted and true labels for each samples.
+        predicted and true labels for each sample.
 
         The sample and event distinction is made in accordance with the
         proposed SzCORE - Seizure Community Open-source Research Evaluation
@@ -91,7 +91,8 @@ class AccuracyMetrics:
         Parameters                                                                                                  
         ----------
         y_true : int                                                                                                  
-          Array of true labels. Expected values are either 0 (no seizure) or 1 (seizure).                              
+          Array of true labels. Expected values are either 0 (no seizure) or
+          1 (seizure).
         y_pred : float 
             Array of predicted labels. Expected values between 0 and 1.
         threshold : str or float
@@ -101,43 +102,46 @@ class AccuracyMetrics:
             Duration of a sample (signal window) in seconds.
         sample_offset : float
             Duration between the start of two consecutive
-            samples in seconds. For example, samples with a duration of 4 seconds                                   
-            and a stride of 1 second would have the following start and stop
-            times:
+            samples in seconds. For example, samples with a duration of 4
+            seconds and a stride of 1 second would have the following start and
+            stop´times:
                 sample 0: 0s to 4s
                 sample 1: 1s to 5s
                 sample 2: 2s to 6s
                 etc.
         event_minimum_overlap : int
-            Minimum overlap between predicted and true events for a detection, in seconds. 
-            Default is any overlap (as in [1]).                                                              
+            Minimum overlap between predicted and true events for a detection,
+            in seconds. Default is 0 (any overlap, as in [1]).
         event_preictal_tolerance : float
-            A predicted seizure is counted as a true prediction if it is predicted up to 
-            event_preictal_tolerance seconds before a true seizure. 
-            Default is 30 seconds (as in [1]).
+            A predicted seizure is counted as a true prediction if it is
+            predicted up to event_preictal_tolerance seconds before a true
+            seizure. Default is 30 seconds (as in [1]).
         event_postictal_tolerance : float                                                                         
-            A predicted seizure is counted as a true prediction if it is predicted up to 
-            event_postictal_tolerance seconds after a true seizure. 
-            Default is 60 seconds (as in [1]).
+            A predicted seizure is counted as a true prediction if it is
+            predicted up to event_postictal_tolerance seconds after a true
+            seizure. Default is 60 seconds (as in [1]).
         event_minimum_separation : float                                                                           
-            Events that are separated by less than event_minimum_separation seconds are merged. 
-            Default is 90 seconds (combined pre- and post-ictal tolerance, as in [1]).
+            Events that are separated by less than event_minimum_separation
+            seconds are merged. Default is 90 seconds (combined pre- and
+            post-ictal tolerance, as in [1]).
         event_maximum_duration : float 
-            Events that are longer than event_maximum_duration seconds are split in events 
-            with the maximum duration. This is done after the merging of close events (see
-            event_minimum_separation).
+            Events that are longer than event_maximum_duration seconds are
+            split in events with the maximum duration. This is done after the
+            merging of close events (see event_minimum_separation).
             Default is 300 seconds (as in [1]).
         """ 
     
-        assert ((y_true == 0) | (y_true == 1)).all(), "y_true must be a binary array!" 
+        assert ((y_true == 0) | (y_true == 1)).all(), ("y_true must be a "
+                                                       "binary array!")
 
         if (y_true != 1).all():
-            warnings.warn("Potential miscellaneous behavior!\nYour input "
-                          "does not contain any events of any duration.")
+            warnings.warn("There are no seizures events in y_true. Is this "
+                          "expected?")
 
         if sample_offset == 0 or sample_offset == None:
-            raise ValueError("sample_stride cannot be 0 or None! For non-overlapping" 
-                                "samples: sample_offset >= sample_duration")
+            raise ValueError("sample_offset cannot be 0 or None. For "
+                             "non-overlapping samples: "
+                             "sample_offset >= sample_duration")
         
         self.sample_duration = sample_duration
         self.sample_offset = sample_offset
@@ -177,7 +181,8 @@ class AccuracyMetrics:
         (self.sample_tn,
          self.sample_fp,
          self.sample_fn,
-         self.sample_tp) = sk_metrics.confusion_matrix(y_true, y_pred, labels=[0,1]).ravel()            
+         self.sample_tp) = sk_metrics.confusion_matrix(y_true, y_pred,
+                                                       labels=[0, 1]).ravel()
         
         self.sample_sensitivity = (self.sample_tp /
                                    (self.sample_tp + self.sample_fn))
@@ -221,10 +226,12 @@ class AccuracyMetrics:
         for event in self.events_true:  
             duration = event[1] - event[0]                           
             if duration < event_minimum_overlap:
-                warnings.warn("Potential miscellaneous behavior! \nYour event_minimum_overlap is greater than the shortest true event. "
-                      "At least one true event will not be taken into account for the event-based evaluation "
-                      "or may not be fully correct." )
-
+                warnings.warn(f"Argument event_minimum_overlap "
+                              f"({event_minimum_overlap}) is greater than "
+                              f"the duration of one of the true events "
+                              f"({duration}). This true event will never be "
+                              f"counted as correctly predicted. Consider "
+                              f"setting event_minimum_overlap={duration}.")
 
         # True positive if a predicted event partially overlaps with a true
         # event.
