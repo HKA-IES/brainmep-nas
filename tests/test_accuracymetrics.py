@@ -153,11 +153,9 @@ class TestAccuracyMetrics:
         am = AccuracyMetrics(y_true, y_pred, sample_duration,
                              sample_offset, threshold=0.5)
 
-        assert am.n_true_seizures == 1
-        assert .0 < am.roc_auc < 1.
-        assert .0 < am.prc_auc < 1.
         assert am.sample_duration == pytest.approx(1.)
         assert am.sample_offset == pytest.approx(1.)
+        assert am.n_true_seizures == 1
         assert am.total_duration == pytest.approx(1.0*60)
         assert am.n_samples == 60
 
@@ -184,6 +182,8 @@ class TestAccuracyMetrics:
         am = AccuracyMetrics(y_true, y_pred, sample_duration,
                              sample_offset, threshold=0.5)
 
+        assert .0 < am.sample_roc_auc < 1.
+        assert .0 < am.sample_prc_auc < 1.
         assert am.sample_tp == 17
         assert am.sample_tn == 32
         assert am.sample_fp == 8
@@ -193,6 +193,8 @@ class TestAccuracyMetrics:
         assert am.sample_precision == pytest.approx(0.68, abs=0.0001)
         assert am.sample_recall == pytest.approx(0.85, abs=0.0001)
         assert am.sample_f_score == pytest.approx(0.7556, abs=0.0001)
+        assert am.sample_accuracy == pytest.approx(0.8167, abs=0.0001)
+        assert am.sample_balanced_accuracy == pytest.approx(0.8250, abs=0.0001)
 
     def test_event_conversion(self):
         """
@@ -238,6 +240,12 @@ class TestAccuracyMetrics:
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
+
+        assert am.event_minimum_overlap == pytest.approx(2.)
+        assert am.event_preictal_tolerance == pytest.approx(1.)
+        assert am.event_postictal_tolerance == pytest.approx(2.)
+        assert am.event_minimum_separation == pytest.approx(2.)
+        assert am.event_maximum_duration == pytest.approx(12.)
 
         for actual, expected in zip(am.events_true, expected_events_true):
             assert actual[0] == pytest.approx(expected[0])
@@ -313,6 +321,7 @@ class TestAccuracyMetrics:
         assert am.event_recall == pytest.approx(0.5, abs=0.0001)
         assert am.event_f_score == pytest.approx(0.5455, abs=0.0001)
         assert am.event_false_detections_per_hour == pytest.approx(114.29, abs=0.01)
+        assert am.event_false_detections_per_interictal_hour == pytest.approx(276.92, abs=0.01)
         assert am.event_average_detection_delay == pytest.approx(1.3333, abs=0.0001)
 
     def test_y_true_all_zeros(self):
@@ -405,15 +414,20 @@ class TestAccuracyMetrics:
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
-        expected_dict = {"n_true_seizures": am.n_true_seizures,
-                         "roc_auc": am.roc_auc,
-                         "prc_auc": am.prc_auc,
+        expected_dict = {"sample_duration": am.sample_duration,
+                         "sample_offset": am.sample_offset,
                          "threshold_method": am.threshold_method,
                          "threshold": am.threshold,
-                         "sample_duration": am.sample_duration,
-                         "sample_offset": am.sample_offset,
-                         "total_duration": am.total_duration,
+                         "event_minimum_overlap": am.event_minimum_overlap,
+                         "event_preictal_tolerance": am.event_preictal_tolerance,
+                         "event_postictal_tolerance": am.event_postictal_tolerance,
+                         "event_minimum_separation": am.event_minimum_separation,
+                         "event_maximum_duration": am.event_maximum_duration,
                          "n_samples": am.n_samples,
+                         "n_true_seizures": am.n_true_seizures,
+                         "total_duration": am.total_duration,
+                         "sample_roc_auc": am.sample_roc_auc,
+                         "sample_prc_auc": am.sample_prc_auc,
                          "sample_tp": am.sample_tp,
                          "sample_tn": am.sample_tn,
                          "sample_fp": am.sample_fp,
@@ -423,6 +437,8 @@ class TestAccuracyMetrics:
                          "sample_precision": am.sample_precision,
                          "sample_recall": am.sample_recall,
                          "sample_f_score": am.sample_f_score,
+                         "sample_accuracy": am.sample_accuracy,
+                         "sample_balanced_accuracy": am.sample_balanced_accuracy,
                          "event_tp": am.event_tp,
                          "event_fp": am.event_fp,
                          "event_sensitivity": am.event_sensitivity,
@@ -430,6 +446,7 @@ class TestAccuracyMetrics:
                          "event_recall": am.event_recall,
                          "event_f_score": am.event_f_score,
                          "event_false_detections_per_hour": am.event_false_detections_per_hour,
+                         "event_false_detections_per_interictal_hour": am.event_false_detections_per_interictal_hour,
                          "event_average_detection_delay": am.event_average_detection_delay
                          }
 

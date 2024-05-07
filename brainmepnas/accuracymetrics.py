@@ -22,18 +22,27 @@ class AccuracyMetrics:
     Compute and store accuracy metrics from arrays of true and predicted
     labels.
     """
-
-    n_true_seizures: int
-    roc_auc: float
-    prc_auc: float
-    threshold_method: str   # "fixed" or "max_f_score"
-    threshold: float
     sample_duration: float  # in seconds
-    sample_offset: float    # between two consecutive windows, in seconds
-    total_duration: float   # in seconds
+    sample_offset: float  # between two consecutive windows, in seconds
+    threshold_method: str  # "fixed" or "max_f_score"
+    threshold: float
+    event_minimum_overlap: float
+    event_preictal_tolerance: float
+    event_postictal_tolerance: float
+    event_minimum_separation: float
+    event_maximum_duration: float
+
+    y_true: np.ndarray
     n_samples: int
+    n_true_seizures: int
+    total_duration: float   # in seconds
+
+    y_pred: np.ndarray
+    y_pred_post_threshold: np.ndarray
 
     # Sample-based metrics
+    sample_roc_auc: float
+    sample_prc_auc: float
     sample_tp: int
     sample_tn: int
     sample_fp: int
@@ -57,13 +66,15 @@ class AccuracyMetrics:
     event_recall: float     # = sensitivity
     event_f_score: float
     event_false_detections_per_hour: float
-    event_interictal_false_detections_per: float
+    # TODO: is the total seizure duration counted with or without the pre- and
+    #  post-ictal tolerance?
+    event_false_detections_per_interictal_hour: float
     event_average_detection_delay: float
 
     def __init__(self, y_true: np.ndarray, y_pred: np.ndarray,
                  sample_duration: float, sample_offset: float,
                  threshold: Union[str, float] = 0.5,
-                 event_minimum_overlap: float = None,
+                 event_minimum_overlap: float = 1e-6,
                  event_preictal_tolerance: float = 30,
                  event_postictal_tolerance: float = 60,
                  event_minimum_separation: float = 90,
@@ -111,7 +122,7 @@ class AccuracyMetrics:
                 etc.
         event_minimum_overlap : int
             Minimum overlap between predicted and true events for a detection,
-            in seconds. Default is 0 (any overlap, as in [1]).
+            in seconds. Default is 1e-6 (any overlap, as in [1]).
         event_preictal_tolerance : float
             A predicted seizure is counted as a true prediction if it is
             predicted up to event_preictal_tolerance seconds before a true
@@ -129,35 +140,63 @@ class AccuracyMetrics:
             split in events with the maximum duration. This is done after the
             merging of close events (see event_minimum_separation).
             Default is 300 seconds (as in [1]).
-        """ 
-    
+        """
+        # Check for validity of arguments
         assert ((y_true == 0) | (y_true == 1)).all(), ("y_true must be a "
                                                        "binary array!")
-
         if (y_true != 1).all():
             warnings.warn("There are no seizures events in y_true. Is this "
                           "expected?")
+        self.y_true = y_true
 
-        if sample_offset == 0 or sample_offset == None:
-            raise ValueError("sample_offset cannot be 0 or None. For "
+        assert ((y_pred >= 0) & (y_pred <= 1)).all(), ("y_pred must contain"
+                                                       "values between 0 and "
+                                                       "1.")
+        self.y_pred = y_pred
+
+        if not sample_duration > 0:
+            raise ValueError("sample_duration must be > 0 seconds.")
+        self.sample_duration = sample_duration
+
+        if not sample_offset > 0:
+            raise ValueError("sample_offset must be > 0 seconds. For "
                              "non-overlapping samples: "
                              "sample_offset >= sample_duration")
-        
-        self.sample_duration = sample_duration
         self.sample_offset = sample_offset
+
+        if not event_minimum_overlap > 0:
+            raise ValueError("event_minimum_overlap must be > 0 seconds.")
+        self.event_minimum_overlap = event_minimum_overlap
+
+        if not event_preictal_tolerance >= 0:
+            raise ValueError("event_preictal_tolerance must be >= 0 seconds.")
+        self.event_preictal_tolerance = event_preictal_tolerance
+
+        if not event_postictal_tolerance >= 0:
+            raise ValueError("event_postictal_tolerance must be >= 0 seconds.")
+        self.event_postictal_tolerance = event_postictal_tolerance
+
+        if not event_minimum_separation >= 0:
+            raise ValueError("event_minimum_separation must be >= 0 seconds.")
+        self.event_minimum_separation = event_minimum_separation
+
+        if not event_maximum_duration > 0:
+            raise ValueError("event_maximum_duration must be > 0 seconds.")
+        self.event_maximum_duration = event_maximum_duration
+
         self.n_samples = len(y_true)
         self.total_duration = ((self.n_samples - 1) * self.sample_offset +
                                self.sample_duration)
 
         # ROC curve
         roc_fpr, roc_tpr, _ = sk_metrics.roc_curve(y_true, y_pred)
-        self.roc_auc = sk_metrics.auc(roc_fpr, roc_tpr)
+        self.sample_roc_auc = sk_metrics.auc(roc_fpr, roc_tpr)
 
         # Precision-recall curve
         (prc_precision,
          prc_recall,
          prc_thresholds) = sk_metrics.precision_recall_curve(y_true, y_pred)
-        self.prc_auc = sk_metrics.auc(prc_recall, prc_precision)
+        self.sample_prc_auc = sk_metrics.auc(prc_recall, prc_precision)
 
         f_scores = 2 * (prc_precision * prc_recall) / (
                 prc_precision + prc_recall)
@@ -173,9 +212,10 @@ class AccuracyMetrics:
             self.threshold_method = "fixed"
         else:
             raise ValueError("threshold should be either a number between 0 "
-                             "and 1 or one of 'max_f_score'.")
+                             "and 1 or 'max_f_score'.")
 
         y_pred = np.where(y_pred >= self.threshold, 1, 0)
+        self.y_pred_post_threshold = y_pred
 
         # Sample-based metrics
         (self.sample_tn,
@@ -218,9 +258,6 @@ class AccuracyMetrics:
                                             event_minimum_separation,
                                             event_maximum_duration)
 
-        if event_minimum_overlap is None:
-            event_minimum_overlap = 1e-6
-
         self.n_true_seizures = len(self.events_true)
 
         for event in self.events_true:  
@@ -249,7 +286,7 @@ class AccuracyMetrics:
             for pred_event in self.events_pred:
                 overlap = (min(true_event_extended[1], pred_event[1]) -
                            max(true_event_extended[0], pred_event[0]))
-                if overlap >= event_minimum_overlap:                                        
+                if overlap >= event_minimum_overlap:
                     self.event_tp += 1
                     delay = pred_event[0] - true_event[0]
                     detection_delays.append(delay)
@@ -277,7 +314,7 @@ class AccuracyMetrics:
                     self.event_fp += 1
 
         # Assuming there is at least one true seizure in the data.
-        if self.n_true_seizures  > 0:                                        
+        if self.n_true_seizures > 0:
             self.event_sensitivity = self.event_tp / self.n_true_seizures
         else:
             self.event_sensitivity = np.nan
@@ -297,8 +334,8 @@ class AccuracyMetrics:
                                                 * 3600)
         
         total_seizure_duration = sum(seizure_duration)
-        self.event_interictal_false_detections_per = ((self.event_fp / (total_duration -
-                                                     total_seizure_duration ) * 3600))
+        self.event_false_detections_per_interictal_hour = ((self.event_fp / (total_duration -
+                                                                             total_seizure_duration) * 3600))
 
     def as_dict(self) -> dict:
         """
