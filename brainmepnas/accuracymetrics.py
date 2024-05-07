@@ -21,6 +21,10 @@ class AccuracyMetrics:
     """
     Compute and store accuracy metrics from arrays of true and predicted
     labels.
+
+    # TODO: Describe all attributes here.
+
+    # TODO: Check for correct values in edge cases (i.e. TP or TN = 0, ...)
     """
     sample_duration: float  # in seconds
     sample_offset: float  # between two consecutive windows, in seconds
@@ -142,16 +146,18 @@ class AccuracyMetrics:
             Default is 300 seconds (as in [1]).
         """
         # Check for validity of arguments
-        assert ((y_true == 0) | (y_true == 1)).all(), ("y_true must be a "
-                                                       "binary array!")
+        if not ((y_true == 0) | (y_true == 1)).all():
+            raise ValueError("y_true must be a binary array!")
+
         if (y_true != 1).all():
             warnings.warn("There are no seizures events in y_true. Is this "
                           "expected?")
         self.y_true = y_true
 
-        assert ((y_pred >= 0) & (y_pred <= 1)).all(), ("y_pred must contain"
-                                                       "values between 0 and "
-                                                       "1.")
+        if not ((y_pred >= 0) & (y_pred <= 1)).all():
+            raise ValueError("y_pred must contain values between 0 and 1.")
+        if len(y_true) != len(y_pred):
+            raise ValueError("y_true and y_pred should have the same length.")
         self.y_pred = y_pred
 
         if not sample_duration > 0:

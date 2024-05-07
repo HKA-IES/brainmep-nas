@@ -20,6 +20,8 @@ class TestAccuracyMetrics:
     The test cases are illustrated in test_accuracymetrics.ods
     """
 
+    # TODO: Add tests for invalid arguments
+
     def test_threshold_fixed(self):
         """
         Verify that the fixed threshold is applied properly by comparing two
@@ -387,6 +389,30 @@ class TestAccuracyMetrics:
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
+
+    def test_y_true_y_pred_all_zeros(self):
+        """
+        Make sure that the classes handles the case where all true and
+        predicted values are zero (i.e. no true seizure, no predicted seizure).
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        y_pred = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=1,
+                             sample_offset=1)
+
+    def test_y_true_y_pred_all_ones(self):
+        """
+        Make sure that the classes handles the case where all true and
+        predicted values are one (i.e. one true seizure, one predicted seizure).
+        """
+        y_true = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        y_pred = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=1,
+                             sample_offset=1)
 
     def test_as_dict(self):
         """
