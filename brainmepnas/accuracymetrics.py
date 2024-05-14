@@ -70,8 +70,6 @@ class AccuracyMetrics:
     event_recall: float     # = sensitivity
     event_f_score: float
     event_false_detections_per_hour: float
-    # TODO: is the total seizure duration counted with or without the pre- and
-    #  post-ictal tolerance?
     event_false_detections_per_interictal_hour: float
     event_average_detection_delay: float
 
@@ -284,11 +282,10 @@ class AccuracyMetrics:
         # before the true start (in the pre-ictal tolerance).
         self.event_tp = 0
         detection_delays = list()
-        seizure_duration = list()
+        last_event_extended_end = 0
+        total_ictal_duration = 0
         for true_event, true_event_extended in zip(self.events_true,
-                                                   self.events_true_extended): 
-            duration = true_event_extended[1] - true_event_extended[0]
-            seizure_duration.append(duration)
+                                                   self.events_true_extended):
             for pred_event in self.events_pred:
                 overlap = (min(true_event_extended[1], pred_event[1]) -
                            max(true_event_extended[0], pred_event[0]))
@@ -296,6 +293,14 @@ class AccuracyMetrics:
                     self.event_tp += 1
                     delay = pred_event[0] - true_event[0]
                     detection_delays.append(delay)
+
+            # Sum of ictal duration
+            # Note: We take into account potential overlap of extended events.
+            if true_event_extended[0] < last_event_extended_end:
+                total_ictal_duration += true_event_extended[1] - last_event_extended_end
+            else:
+                total_ictal_duration += true_event_extended[1] - true_event_extended[0]
+            last_event_extended_end = true_event_extended[1]
         
         if len(detection_delays) > 0:
             self.event_average_detection_delay = np.average(detection_delays) 
@@ -338,10 +343,9 @@ class AccuracyMetrics:
         total_duration = (len(y_true) - 1) * sample_offset + sample_duration
         self.event_false_detections_per_hour = ((self.event_fp / total_duration)                
                                                 * 3600)
-        
-        total_seizure_duration = sum(seizure_duration)
+
         self.event_false_detections_per_interictal_hour = ((self.event_fp / (total_duration -
-                                                                             total_seizure_duration) * 3600))
+                                                                             total_ictal_duration) * 3600))
 
     def as_dict(self) -> dict:
         """
