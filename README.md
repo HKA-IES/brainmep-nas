@@ -45,3 +45,6 @@ documentation is unclear.
 
 ## Publication
 This package was used and characterized in the publication "XYZ"
+
+## License
+This project is licensed under GNU General Public License v3.0.
