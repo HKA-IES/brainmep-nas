@@ -2,7 +2,7 @@
 
 # import built-in module
 import dataclasses
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Literal
 import numbers
 import warnings
 
@@ -22,13 +22,167 @@ class AccuracyMetrics:
     Compute and store accuracy metrics from arrays of true and predicted
     labels.
 
-    # TODO: Describe all attributes here.
+    Sample-based metrics are calculated on a sample-by-sample basis. These
+    metrics are ubiquitous in machine learning.
+
+    Event-based metrics represent more adequately the detection of seizure
+    events, whereas a seizure is assumed to last for many samples.
+
+    The sample and event distinction is made in accordance with the proposed
+    SzCORE - Seizure Community Open-source Research Evaluation framework[1].
+    Portions of the code were adapted from the implementation of the
+    sz-validation-framework package, available on Github:
+    https://github.com/esl-epfl/sz-validation-framework
+
+    A future goal is to formally integrate the scoring module of
+    sz-validation-framework in this class.
+
+    References
+    ----------
+    [1] J. Dan et al., “SzCORE: A Seizure Community Open-source Research
+    Evaluation framework for the validation of EEG-based automated seizure
+    detection algorithms.” arXiv, Feb. 23, 2024. Accessed: Feb. 27, 2024.
+    [Online]. Available: http://arxiv.org/abs/2402.13005
+
+    Attributes
+    ----------
+    sample_duration: float
+        Duration of a single sample, in seconds.
+    sample_offset: float
+        Time offset between the end of a sample and the beginning of the
+        following sample, in seconds.
+    threshold_method: str
+        Method used to set the threshold. Can be one of the following:
+        - "fixed": threshold fixed by the user.
+        - "max_f_score": threshold set to maximize the F-score.
+    threshold: float
+        Threshold to separate seizure from non-seizure at a sample level. A
+        predicted value below the threshold corresponds to a non-seizure,
+        whereas a predicted above or equal to the threshold corresponds to a
+        seizure.
+    event_minimum_overlap : int
+        Minimum overlap between predicted and true events for a detection,
+        in seconds.
+    event_preictal_tolerance : float
+        A predicted seizure is counted as a true prediction if it is
+        predicted up to event_preictal_tolerance seconds before a true
+        seizure.
+    event_postictal_tolerance : float
+        A predicted seizure is counted as a true prediction if it is
+        predicted up to event_postictal_tolerance seconds after a true
+        seizure.
+    event_minimum_separation : float
+        Events that are separated by less than event_minimum_separation
+        seconds are merged.
+    event_maximum_duration : float
+        Events that are longer than event_maximum_duration seconds are
+        split in events with the maximum duration. This is done after the
+        merging of close events (see event_minimum_separation).
+    y_true: np.ndarray
+        Array of true labels, where 0 corresponds to an interictal sample (no
+        seizure) and 1 corresponds to an ictal sample (seizure).
+    n_samples: int
+        Number of samples.
+    n_true_seizures: int
+        Number of true seizure events in y_true.
+    total_duration: float
+        Total duration of y_true.
+    y_pred: np.ndarray
+        Array of predicted values (between 0 and 1).
+    y_pred_post_threshold: np.ndarray
+        Array of predicted labels. The threshold is applied to y_pred such that
+        values < threshold are assigned the label 0 (interictal, no seizure)
+        and values >= threshold are assigned the label 1 (ictal, seizure).
+        sample_roc_auc: float
+    sample_prc_auc: float
+        Sample-based metric: Area under the precision-recall curve.
+    sample_tp: int
+        Sample-based metric: true positives.
+    sample_tn: int
+        Sample-based metric: true negatives.
+    sample_fp: int
+        Sample-based metric: false positives.
+    sample_fn: int
+        Sample-based metric: false negatives.
+    sample_sensitivity: float
+        Sample-based metric: sensitivity (true positive rate).
+            TPR = TP/(TP+FN)
+    sample_specificity: float
+        Sample-based metric: specificity (true negative rate).
+            TNR = TN/(TN+FP)
+    sample_precision: float
+        Sample-based metric: precision (positive predictive value).
+            PPV = TP/(TP+FP)
+    sample_recall: float
+        Sample-based metric: recall (equivalent to sensitivity, true positive
+        rate).
+            TPR = TP/(TP+FN)
+    sample_f_score: float
+        Sample-based metric: F-score (harmonic mean of precision and recall)
+            F1 = 2*(PPV*TPR)/(PPV+TPR)
+    sample_accuracy: float
+        Sample-based metric: proportion of correct predictions over all
+        predictions.
+            ACC = (TP+TN)/(TP+TN+FP+FN)
+    sample_balanced_accuracy: float
+        Sample-based metric: arithmetic mean of sensitivity and specificity.
+            BALACC = (TPR+TNR)/2
+    events_true: List[Tuple[float, float]]
+        List of true events, where each event is represented of a tuple of
+        (start_time, end_time) for the event, in seconds from the beginning of
+        y_true.
+        Events are obtained by first compiling a list of the start and end
+        times of consecutive 1 labels in y_true. Then, events that are
+        separated by less than event_minimum_separation seconds are merged.
+        Finally, events that are longer than event_maximum_duration seconds are
+        split in events with the maximum duration.
+    events_true_extended: List[Tuple[float, float]]
+        List of extended true events, where the true events are extended by
+        adding event_preictal_tolerance seconds at the beginning and
+        event_postictal_tolerance seconds at the end. A predicted event is
+        counted as a true prediction if it has an overlap of at-least
+        event_minimum_overlap seconds with an extended event. Each event is
+        represented of a tuple of (start_time, end_time) for the event, in
+        seconds from the beginning of y_true.
+    events_pred: List[Tuple[float, float]]
+        List of predicted events, where each event is represented of a tuple of
+        (start_time, end_time) for the event, in seconds from the beginning of
+        y_pred.
+        See events_true for the procedure to obtain events from y_pred.
+    event_tp: int
+        Event-based metric: true positives.
+    event_fp: int
+        Event-based metric: false positives.
+    event_sensitivity: float
+        Event-based metric: sensitivity (true positive rate).
+            TPR = TP/P
+    event_precision: float
+        Event-based metric: precision (positive predictive value).
+            PPV = TP/(TP+FP)
+    event_recall: float
+        Event-based metric: recall (equivalent to sensitivity, true positive
+        rate).
+            TPR = TP/P
+    event_f_score: float
+        Event-based metric: F-score (harmonic mean of precision and recall)
+            F1 = 2*(PPV*TPR)/(PPV+TPR)
+    event_false_detections_per_hour: float
+        Number of FP per recording hour.
+    event_false_detections_per_interictal_hour: float
+        Number of FP per interictal hour, where the total interictal time
+        corresponds to the total duration of true seizure events.
+    event_average_detection_delay: float
+        Average delay between the beginning of a predicted event and the
+        associated true event (without considering the pre-ictal tolerance).
+        The delay is positive if the prediction occurs after the true start,
+        and negative if it occurs before the true start (in the pre-ictal
+        tolerance).
 
     # TODO: Check for correct values in edge cases (i.e. TP or TN = 0, ...)
     """
-    sample_duration: float  # in seconds
-    sample_offset: float  # between two consecutive windows, in seconds
-    threshold_method: str  # "fixed" or "max_f_score"
+    sample_duration: float
+    sample_offset: float
+    threshold_method: Literal["fixed", "max_f_score"]
     threshold: float
     event_minimum_overlap: float
     event_preictal_tolerance: float
@@ -39,7 +193,7 @@ class AccuracyMetrics:
     y_true: np.ndarray
     n_samples: int
     n_true_seizures: int
-    total_duration: float   # in seconds
+    total_duration: float
 
     y_pred: np.ndarray
     y_pred_post_threshold: np.ndarray
@@ -54,7 +208,7 @@ class AccuracyMetrics:
     sample_sensitivity: float
     sample_specificity: float
     sample_precision: float
-    sample_recall: float    # = sensitivity
+    sample_recall: float
     sample_f_score: float
     sample_accuracy: float
     sample_balanced_accuracy: float
@@ -67,7 +221,7 @@ class AccuracyMetrics:
     event_fp: int
     event_sensitivity: float
     event_precision: float
-    event_recall: float     # = sensitivity
+    event_recall: float
     event_f_score: float
     event_false_detections_per_hour: float
     event_false_detections_per_interictal_hour: float
@@ -75,7 +229,7 @@ class AccuracyMetrics:
 
     def __init__(self, y_true: np.ndarray, y_pred: np.ndarray,
                  sample_duration: float, sample_offset: float,
-                 threshold: Union[str, float] = 0.5,
+                 threshold: Union[Literal["max_f_score"], float] = 0.5,
                  event_minimum_overlap: float = 1e-6,
                  event_preictal_tolerance: float = 30,
                  event_postictal_tolerance: float = 60,
@@ -94,8 +248,8 @@ class AccuracyMetrics:
         A future goal is to formally integrate the scoring module of
         sz-validation-framework in this class.
 
-        Reference
-        ---------
+        References
+        ----------
         [1] J. Dan et al., “SzCORE: A Seizure Community Open-source Research
         Evaluation framework for the validation of EEG-based automated seizure
         detection algorithms.” arXiv, Feb. 23, 2024. Accessed: Feb. 27, 2024.
@@ -276,10 +430,6 @@ class AccuracyMetrics:
 
         # True positive if a predicted event partially overlaps with a true
         # event.
-        # Detection delay is the time between the true seizure start
-        # (NOT extended) and the predicted detection. The delay is positive if
-        # the prediction occurs after the true start, and negative if it occurs
-        # before the true start (in the pre-ictal tolerance).
         self.event_tp = 0
         detection_delays = list()
         last_event_extended_end = 0
@@ -377,25 +527,26 @@ class AccuracyMetrics:
 
         Parameters
         ----------
-        y : int or float
-            Array of seizure labels. Expected values are between 0
-            (no seizure) or 1 (seizure).
+        y : np.ndarray
+            Array of seizure labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
         sample_duration : float
             Duration of a sample (label) in seconds.
         sample_offset : float 
             Duration between the start of two consecutive samples in seconds.
         event_minimum_separation : float
-            Events that are separated by less than
-            event_minimum_separation seconds are merged.
+            Events that are separated by less than event_minimum_separation
+            seconds are merged.
         event_maximum_duration : float 
             Events that are longer than event_maximum_duration seconds 
             are split in events with the maximum duration. This is done 
             after the merging of close events (see event_minimum_separation).
 
         Returns
-        ------
-        shorter_events : list
-           list of tuples with events.
+        -------
+        events : List[Tuple[float, float]]
+            List of events, where each event is represented by a tuple
+            (start_time, end_time), in seconds from the beginning of y.
         """
         # Adapted from
         # https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/annotations.py
@@ -456,7 +607,8 @@ class AccuracyMetrics:
         return shorter_events
 
     @staticmethod
-    def _extend_events(events: List[tuple], preictal: float,
+    def _extend_events(events: List[Tuple[float, float]],
+                       preictal: float,
                        postictal: float) -> List[Tuple[float, float]]:
         """
         Extend events in the pre- and post-ictal directions.
@@ -465,17 +617,18 @@ class AccuracyMetrics:
 
         Parameters
         ----------
-        events : list 
-            List of tuples with event onset and offset, returned by _get_events().
+        events : List[Tuple[float, float]]
+            List of events returned by _get_events().
         preictal : float
             Time to extend before each event, in seconds.
         postictal : float
             Time to extend after each event, in seconds.
 
         Returns
-        ------
-        extended_events : list
-           list of tuples with extended events.
+        -------
+        extended_events : List[Tuple[float, float]]
+            List of extended events, where each event is represented by a tuple
+            (start_time, end_time), in seconds from the beginning of y.
         """
         extended_events = events.copy()
 
