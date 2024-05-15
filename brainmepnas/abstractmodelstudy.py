@@ -24,6 +24,9 @@ class AbstractModelStudy(abc.ABC):
     To use, inherit from this class and implement the following methods:
         - [...]
 
+    # TODO: Consider adding methods to run the whole studies in Python, with/
+    #       without multiprocessing.
+
     Class attributes
     ----------------
     N_FOLDS: int
@@ -52,8 +55,11 @@ class AbstractModelStudy(abc.ABC):
     # - Abstract methods to be implemented by user -
     # ----------------------------------------------
 
+    # Note: We manually raise NotImplementedError instead of using the
+    #  abc.abstractmethod decorator because the latter does not prevent an
+    #  abstract class method from being called.
+
     @classmethod
-    @abc.abstractmethod
     def _sample_search_space(cls, trial: optuna.Trial) -> Dict[str, Any]:
         """
         Sample the parameters to optimize from the search space.
@@ -71,10 +77,9 @@ class AbstractModelStudy(abc.ABC):
         params: Dict[str, Any]
             Dictionary of parameter names and their values.
         """
-        pass
+        raise NotImplementedError
 
     @classmethod
-    @abc.abstractmethod
     def get_accuracy_metrics(cls, trial: optuna.Trial,
                              inner_fold: int) -> AccuracyMetrics:
         """
@@ -109,10 +114,9 @@ class AbstractModelStudy(abc.ABC):
         accuracy_metrics: AccuracyMetrics
             AccuracyMetrics object.
         """
-        pass
+        raise NotImplementedError
 
     @classmethod
-    @abc.abstractmethod
     def get_hardware_metrics(cls, trial: optuna.Trial,
                              inner_fold: int) -> HardwareMetrics:
         """
@@ -147,7 +151,7 @@ class AbstractModelStudy(abc.ABC):
         hardware_metrics: HardwareMetrics
             HardwareMetrics object.
         """
-        pass
+        raise NotImplementedError
 
     # -----------------------
     # - Pre-defined methods -
@@ -188,7 +192,7 @@ class AbstractModelStudy(abc.ABC):
             outer_fold_dir = cls.BASE_DIR / f"outer_fold_{outer_fold}"
             os.mkdir(outer_fold_dir)
 
-            study_name = cls.NAME + "_outerfold_" + str(outer_fold)
+            study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
             study = optuna.create_study(storage=study_storage,
                                         study_name=study_name)
 
@@ -243,10 +247,23 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def save_metrics(cls, trial: optuna.Trial, inner_fold: int,
                      metrics: Union[AccuracyMetrics, HardwareMetrics]):
+        """
+        Pickle the metrics object to
+        {trial_dir} / inner_fold_{inner_fold}_{accuracy/hardware}_metrics.pickle.
+
+        Parameters
+        ----------
+        trial: optuna.Trial
+            Trial object.
+        inner_fold: int
+            Inner fold.
+        metrics: Union[AccuracyMetrics, HardwareMetrics]
+            Metrics object to save.
+        """
         if isinstance(metrics, AccuracyMetrics):
-            metrics_str = "accuracymetrics"
+            metrics_str = "accuracy_metrics"
         elif isinstance(metrics, HardwareMetrics):
-            metrics_str = "hardwaremetrics"
+            metrics_str = "hardware_metrics"
         else:
             raise TypeError(f"Invalid type for metrics: {type(metrics)}. "
                             f"Should be either AccuracyMetrics or "
@@ -258,6 +275,17 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def complete_trial(cls, study: optuna.Study, trial: optuna.Trial):
+        """
+        Complete the given trial by compiling the produced metrics, extracting
+        the desired objectives, and reporting the objectives to the study.
+
+        Parameters
+        ----------
+        study: optuna.Study
+            Study object.
+        trial: optuna.Trial
+            Trial object.
+        """
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         trial.set_user_attr("study_sampler", str(trial.study.sampler))
 
@@ -267,12 +295,12 @@ class AbstractModelStudy(abc.ABC):
 
         try:
             for f in range(n_inner_folds):
-                am_path = trial_dir / f"inner_fold_{f}_accuracymetrics.pickle"
+                am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
                 am = pickle.load(open(am_path, "rb"))
-                hm_path = trial_dir / f"inner_fold_{f}_hardwaremetrics.pickle"
+                hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
                 hm = pickle.load(open(hm_path, "rb"))
                 cm = CombinedMetrics(am, hm, 0)
-                cm_path = trial_dir / f"inner_fold_{f}_combinedmetrics.pickle"
+                cm_path = trial_dir / f"inner_fold_{f}_combined_metrics.pickle"
                 pickle.dump(cm, open(cm_path, "wb"))
                 d = am.as_dict()
                 d.update(hm.as_dict())
@@ -298,11 +326,48 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def get_outer_fold(cls, study: optuna.Study) -> int:
+        """
+        Read the current outer fold from a study.
+
+        Parameters
+        ----------
+        study: optuna.Study
+            Study object.
+
+        Returns
+        -------
+        outer_fold: int
+            Outer fold.
+        """
         return int(study.user_attrs["outer_fold"])
 
     @classmethod
     def get_trial_dir(cls, trial: optuna.Trial) -> pathlib.Path:
+        """
+        Read the directory associated to the trial.
+
+        Parameters
+        ----------
+        trial: optuna.Trial
+            Trial object.
+
+        Returns
+        -------
+        trial_dir: pathlib.Path
+            Trial directory.
+        """
         return pathlib.Path(trial.user_attrs["trial_dir"])
+
+    def __init__(self):
+        """
+        This class is not meant to be instanciated. All methods and attributes
+        are class methods and class attributes.
+
+        Raises
+        ------
+        RuntimeError
+        """
+        raise RuntimeError
 
     @classmethod
     def __init_subclass__(cls):
@@ -475,6 +540,12 @@ class AbstractModelStudy(abc.ABC):
         if __name__ == "__main__":
             MyModelStudy.cli_entry_point()
         ```
+
+        Help for the cli can be seen by typing in the terminal:
+        ```
+        python {FILE}.py --help
+        ```
+        where FILE is the file where MyModelStudy is defined.
         """
         # init_trial()
         init_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
@@ -601,5 +672,3 @@ class AbstractModelStudy(abc.ABC):
                                   study_name=study_name)
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
         cls.complete_trial(study, trial)
-
-
