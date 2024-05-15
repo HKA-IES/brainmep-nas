@@ -93,7 +93,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> AccuracyMetrics:
+                              inner_fold: int = None) -> AccuracyMetrics:
         """
         Calculate the accuracy metrics for a given trial and inner fold. This
         function is called by the public get_accuracy_metrics(), which
@@ -134,7 +134,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> HardwareMetrics:
+                              inner_fold: int = None) -> HardwareMetrics:
         """
         Calculate the hardware metrics for a given trial and inner fold. This
         function is called by the public get_hardware_metrics(), which
@@ -173,9 +173,9 @@ class AbstractModelStudy(abc.ABC):
         """
         raise NotImplementedError
 
-    # -----------------------
-    # - Pre-defined methods -
-    # -----------------------
+    # ------------------
+    # - Public methods -
+    # ------------------
 
     @classmethod
     def setup(cls):
@@ -239,7 +239,7 @@ class AbstractModelStudy(abc.ABC):
         study_storage.scoped_session.get_bind().dispose()
 
     @classmethod
-    def init_trial(cls, study: optuna.Study):
+    def init_trial(cls, study: optuna.Study) -> optuna.Trial:
         """
         Initialize a new trial.
 
@@ -251,6 +251,10 @@ class AbstractModelStudy(abc.ABC):
         ----------
         study: optuna.Study
             Current study.
+
+        Returns
+        -------
+        trial: optuna.Trial
         """
         new_trial = study.ask()
 
@@ -270,9 +274,11 @@ class AbstractModelStudy(abc.ABC):
         with open(file_path, "wb") as file:
             pickle.dump(new_trial, file)
 
+        return new_trial
+
     @classmethod
     def get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> AccuracyMetrics:
+                              inner_fold: int = None) -> AccuracyMetrics:
         """
         Calculate and save accuracy metrics for a specific trial and inner fold
         to the trial directory as
@@ -305,12 +311,12 @@ class AbstractModelStudy(abc.ABC):
         am = cls._get_accuracy_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         am_path = trial_dir / f"inner_fold_{inner_fold}_accuracy_metrics.pickle"
-        pickle.dump(am, open(am_path, "rb"))
+        pickle.dump(am, open(am_path, "wb"))
         return am
 
     @classmethod
     def get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> HardwareMetrics:
+                              inner_fold: int = None) -> HardwareMetrics:
         """
         Calculate and save hardware metrics for a specific trial and inner fold
         to the trial directory as
@@ -342,8 +348,8 @@ class AbstractModelStudy(abc.ABC):
         """
         hm = cls._get_hardware_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        am_path = trial_dir / f"inner_fold_{inner_fold}_accuracy_metrics.pickle"
-        pickle.dump(hm, open(am_path, "rb"))
+        hm_path = trial_dir / f"inner_fold_{inner_fold}_hardware_metrics.pickle"
+        pickle.dump(hm, open(hm_path, "wb"))
         return hm
 
     @classmethod

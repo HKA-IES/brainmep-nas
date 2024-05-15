@@ -25,7 +25,8 @@ license = {file = "LICENSE"}
 [project.optional-dependencies]
 test = [
     "pytest",
-    "pytest-cov",]
+    "pytest-cov",
+    "pytest-mock",]
 mltk = [
     "silabs-mltk[full]",]
 

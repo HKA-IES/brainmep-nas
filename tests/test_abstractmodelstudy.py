@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
-import configparser
 import os.path
 import shutil
-import time
+import pickle
 
-import optuna
 # import third-party modules
 import pytest
+import optuna
 
 # import your own module
-from brainmepnas import AbstractModelStudy
+from brainmepnas import AbstractModelStudy, AccuracyMetrics, HardwareMetrics
 from dummymodelstudy1 import DummyModelStudy1
 
 
@@ -65,7 +64,7 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(DummyModelStudy1)
 
-    def test_init_trial(self):
+    def test_init_trial(self, mocker):
         DummyModelStudy1.setup()
         study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -75,10 +74,17 @@ class TestAbstractModelStudy:
         study = optuna.load_study(study_name=study_name,
                                   storage=study_storage)
 
-        DummyModelStudy1.init_trial(study)
+        mocked_method = mocker.patch(
+            "dummymodelstudy1.DummyModelStudy1._sample_search_space")
+        mocked_method.return_value = None
 
+        trial = DummyModelStudy1.init_trial(study)
+
+        mocked_method.assert_called_once()
         assert os.path.isdir(study_dir / "trial_0")
         assert os.path.isfile(study_dir / "current_trial.pickle")
+        assert isinstance(trial, optuna.Trial)
+        # assert isinstance(pickle.load(open(study_dir / "current_trial.pickle", "rb")), optuna.Trial)
 
         # Properly close connection to the storage
         study_storage.remove_session()
@@ -86,8 +92,57 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(DummyModelStudy1)
 
-    def test_save_metrics(self):
-        raise NotImplementedError
+    def test_get_accuracy_metrics(self, mocker):
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = DummyModelStudy1.init_trial(study)
+        trial_dir = DummyModelStudy1.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_accuracy_metrics")
+        mocked_method.return_value = None
+
+        am = DummyModelStudy1.get_accuracy_metrics(trial, 1)
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_1_accuracy_metrics.pickle", "rb")) == am
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
+
+    def test_get_hardware_metrics(self, mocker):
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = DummyModelStudy1.init_trial(study)
+        trial_dir = DummyModelStudy1.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_hardware_metrics")
+        mocked_method.return_value = None
+
+        hm = DummyModelStudy1.get_hardware_metrics(trial, 1)
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_1_hardware_metrics.pickle", "rb")) == hm
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
 
     def test_complete_trial(self):
         raise NotImplementedError
