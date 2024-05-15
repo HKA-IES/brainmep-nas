@@ -45,13 +45,13 @@ class DummyModelStudy1(AbstractModelStudy):
         pass
 
     @classmethod
-    def get_accuracy_metrics(cls, trial: optuna.Trial,
-                             inner_fold: int) -> AccuracyMetrics:
+    def _get_accuracy_metrics(cls, trial: optuna.Trial,
+                              inner_fold: int) -> AccuracyMetrics:
         pass
 
     @classmethod
-    def get_hardware_metrics(cls, trial: optuna.Trial,
-                             inner_fold: int) -> HardwareMetrics:
+    def _get_hardware_metrics(cls, trial: optuna.Trial,
+                              inner_fold: int) -> HardwareMetrics:
         pass
 
 

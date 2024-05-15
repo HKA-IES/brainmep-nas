@@ -33,9 +33,9 @@ class TestAbstractModelStudy:
         with pytest.raises(NotImplementedError):
             AbstractModelStudy._sample_search_space(None)
         with pytest.raises(NotImplementedError):
-            AbstractModelStudy.get_accuracy_metrics(None, None)
+            AbstractModelStudy._get_accuracy_metrics(None, None)
         with pytest.raises(NotImplementedError):
-            AbstractModelStudy.get_hardware_metrics(None, None)
+            AbstractModelStudy._get_hardware_metrics(None, None)
 
     def test_implementation_not_instantiable(self):
         with pytest.raises(RuntimeError):
