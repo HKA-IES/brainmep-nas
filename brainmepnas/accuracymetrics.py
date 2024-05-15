@@ -93,7 +93,10 @@ class AccuracyMetrics:
         Array of predicted labels. The threshold is applied to y_pred such that
         values < threshold are assigned the label 0 (interictal, no seizure)
         and values >= threshold are assigned the label 1 (ictal, seizure).
-        sample_roc_auc: float
+    sample_roc_auc: float
+        Sample-based metric: Area under the receiver-operating curve. The 
+        x-axis is the false positive rate (FPR = 1 - TNR) and the y-axis is the
+        sensitivity (TPR).
     sample_prc_auc: float
         Sample-based metric: Area under the precision-recall curve.
     sample_tp: int
