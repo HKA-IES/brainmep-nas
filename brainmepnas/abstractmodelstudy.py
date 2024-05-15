@@ -24,31 +24,43 @@ class AbstractModelStudy(abc.ABC):
     To use, inherit from this class and implement the following methods:
         - [...]
 
-    # TODO: Consider adding methods to run the whole studies in Python, with/
-    #       without multiprocessing.
-
     Class attributes
     ----------------
-    N_FOLDS: int
-        [...]
+    [...]
     """
+    # TODO: Consider adding methods to run the whole studies in Python, with/
+    #       without multiprocessing.
+    # TODO: Support an arbitrary amount of objectives (1 to ...)
+
+    # ----------------------------------------------
+    # - Class attributes to be defined by the user -
+    # ----------------------------------------------
+
+    # Note: All class attributes should be defined by the user. This is checked
+    #  in the __init_subclass__() method.
+
+    # Model study
     NAME: str
     SAMPLER: optuna.samplers.BaseSampler
     BASE_DIR: pathlib.Path
     N_FOLDS: int
+    N_TRIALS: int
+    THIS_FILE: pathlib.Path # path to file of implementation
+
+    # Objectives
     OBJ_1_METRIC: str
     OBJ_1_SCALING: Callable
     OBJ_1_DIRECTION: str
     OBJ_2_METRIC: str
     OBJ_2_SCALING: Callable
     OBJ_2_DIRECTION: str
-    N_PARALLEL_GPU_JOBS: int    # recommended: = number of GPUs
-    N_PARALLEL_CPU_JOBS: int    # recommended: >= 1
-    N_TRIALS: int
-    IMPLEMENTATION_FILE: pathlib.Path
-    CALL_ACCURACY_METRICS: Literal["once", "per_inner_fold", "never"]
+
+    # Jobs queue
+    N_PARALLEL_GPU_JOBS: int  # recommended: = number of GPUs
+    N_PARALLEL_CPU_JOBS: int  # recommended: >= 1
+    GET_ACCURACY_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
     GET_ACCURACY_METRICS_USE_GPU: bool
-    CALL_HARDWARE_METRICS: Literal["once", "per_inner_fold", "never"]
+    GET_HARDWARE_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
     GET_HARDWARE_METRICS_USE_GPU: bool
 
     # ----------------------------------------------
@@ -88,13 +100,13 @@ class AbstractModelStudy(abc.ABC):
         If your implementation benefits from a GPU, set
         GET_ACCURACY_METRICS_USE_GPU=True.
 
-        This is called depending on the value of CALL_ACCURACY_METRICS:
+        This is called depending on the value of GET_ACCURACY_METRICS_CALL:
             "once": called once, independently of inner_fold. If
-                    CALL_HARDWARE_METRICS=="once", get_hardware_metrics() is
+                    GET_HARDWARE_METRICS_CALL=="once", get_hardware_metrics() is
                     called once after the execution of get_accuracy_metrics()
                     is complete.
             "per_inner_fold": called once per inner_fold. If
-                              CALL_HARDWARE_METRICS=="per_inner_fold",
+                              GET_HARDWARE_METRICS_CALL=="per_inner_fold",
                               get_hardware_metrics() is called for each fold
                               after the execution of the corresponding
                               get_accuracy_metrics() is complete.
@@ -125,13 +137,13 @@ class AbstractModelStudy(abc.ABC):
         If your implementation benefits from a GPU, set
         GET_HARDWARE_METRICS_USE_GPU=True.
 
-        This is called depending on the value of CALL_HARDWARE_METRICS:
+        This is called depending on the value of GET_HARDWARE_METRICS_CALL:
             "once": called once, independently of inner_fold. If
-                    CALL_ACCURACY_METRICS=="once", get_hardware_metrics() is
-                    called once after the execution of get_accuracy_metrics()
-                    is complete.
+                    GET_ACCURACY_METRICS_CALL=="once", get_hardware_metrics()
+                    is called once after the execution of
+                    get_accuracy_metrics() is complete.
             "per_inner_fold": called once per inner_fold. If
-                              CALL_ACCURACY_METRICS=="per fold",
+                              GET_ACCURACY_METRICS_CALL=="per fold",
                               get_hardware_metrics() is called for each fold
                               after the execution of the corresponding
                               get_accuracy_metrics() is complete.
@@ -184,7 +196,8 @@ class AbstractModelStudy(abc.ABC):
                                   f"exists. Interrupting setup to prevent "
                                   f"undesired overwrite of existing data.")
 
-        study_storage = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+        study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
 
         # One study per outer fold
         run_study_files = []
@@ -207,10 +220,15 @@ class AbstractModelStudy(abc.ABC):
             study.set_user_attr("study_dir", str(outer_fold_dir.resolve()))
             study.set_user_attr("sampler_path", str(sampler_path.resolve()))
 
-            cls._create_run_trial_sh(outer_fold_dir, study_storage, study_name,
+            cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
                                      sampler_path, outer_fold)
-            run_study_files.append(cls._create_run_study_sh(outer_fold_dir))
+            run_study_sh_path = cls._create_run_study_sh(outer_fold_dir)
+            run_study_files.append(run_study_sh_path)
         cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
 
     @classmethod
     def init_trial(cls, study: optuna.Study):
@@ -373,7 +391,15 @@ class AbstractModelStudy(abc.ABC):
     def __init_subclass__(cls):
         # Adapted from https://stackoverflow.com/a/55544173
         required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
-                                    "N_GPUS", "N_TRIALS", "IMPLEMENTATION_FILE"]
+                                    "N_TRIALS", "THIS_FILE", "OBJ_1_METRIC",
+                                    "OBJ_1_SCALING", "OBJ_1_DIRECTION",
+                                    "OBJ_2_METRIC", "OBJ_2_SCALING",
+                                    "OBJ_2_DIRECTION", "N_PARALLEL_GPU_JOBS",
+                                    "N_PARALLEL_CPU_JOBS",
+                                    "GET_ACCURACY_METRICS_CALL",
+                                    "GET_ACCURACY_METRICS_USE_GPU",
+                                    "GET_HARDWARE_METRICS_CALL",
+                                    "GET_HARDWARE_METRICS_USE_GPU"]
         for var in required_class_variables:
             if not hasattr(cls, var):
                 raise NotImplementedError(f"Class {cls} lacks required '{var}'"
@@ -399,7 +425,7 @@ class AbstractModelStudy(abc.ABC):
                  f"export PYTHONPATH='{os.environ['PYTHONPATH']}'",
                  "",
                  "# Initialize trial",
-                 f"python {cls.IMPLEMENTATION_FILE} init_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()}",
+                 f"python {cls.THIS_FILE} init_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()}",
                  "",
                  "# Configure task spooler",
                  f"# {cls.N_PARALLEL_CPU_JOBS} CPU jobs + {cls.N_PARALLEL_GPU_JOBS} GPU jobs = {n_total_jobs} total jobs",
@@ -414,32 +440,32 @@ class AbstractModelStudy(abc.ABC):
         job_names = []
 
         # Call once
-        if cls.CALL_ACCURACY_METRICS == "once":
+        if cls.GET_ACCURACY_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_accuracy_metrics -t {trial_path})"]
+            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path})"]
 
-        if cls.CALL_HARDWARE_METRICS == "once":
+        if cls.GET_HARDWARE_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            if cls.CALL_ACCURACY_METRICS == "once":
+            if cls.GET_ACCURACY_METRICS_CALL == "once":
                 # Wait for last get_accuracy_metrics job to complete.
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path})"]
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path})"]
             else:
-                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path})"]
+                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path})"]
 
         # Call per_inner_fold
         n_inner_folds = cls.N_FOLDS-1
         for inner_fold in range(n_inner_folds):
-            if cls.CALL_ACCURACY_METRICS == "per_inner_fold":
+            if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_accuracy_metrics -t {trial_path} -i {inner_fold})"]
+                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path} -i {inner_fold})"]
 
-            if cls.CALL_HARDWARE_METRICS == "per_inner_fold":
+            if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                if cls.CALL_ACCURACY_METRICS == "per_inner_fold":
+                if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                     # Wait for last get_accuracy_metrics job to complete.
-                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
                 else:
-                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
 
         # Wait for all jobs to complete
         lines += [""]
@@ -448,7 +474,7 @@ class AbstractModelStudy(abc.ABC):
 
         lines += ["",
                   "# Complete trial",
-                  f"python {cls.IMPLEMENTATION_FILE} complete_trial",
+                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -t {trial_path}",
                   "",
                   "echo 'Trial complete.'"]
 
@@ -470,6 +496,7 @@ class AbstractModelStudy(abc.ABC):
                  "",
                  f"echo 'Run study'",
                  "",
+                 f"# {cls.N_TRIALS} trials.",
                  f"for i in {{0..{cls.N_TRIALS-1}}}",
                  "do",
                  "    bash run_trial.sh",
