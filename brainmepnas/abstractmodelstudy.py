@@ -1,0 +1,605 @@
+# -*- coding: utf-8 -*-
+
+# import built-in module
+import abc
+import pathlib
+import os
+import pickle
+from typing import Callable, Dict, Union, List, Any, Literal
+import datetime
+
+# import third-party modules
+import optuna
+import pandas as pd
+import click
+
+# import your own module
+from brainmepnas import AccuracyMetrics, CombinedMetrics, HardwareMetrics
+
+
+class AbstractModelStudy(abc.ABC):
+    """
+    Abstract implementation of a model study.
+
+    To use, inherit from this class and implement the following methods:
+        - [...]
+
+    Class attributes
+    ----------------
+    N_FOLDS: int
+        [...]
+    """
+    NAME: str
+    SAMPLER: optuna.samplers.BaseSampler
+    BASE_DIR: pathlib.Path
+    N_FOLDS: int
+    OBJ_1_METRIC: str
+    OBJ_1_SCALING: Callable
+    OBJ_1_DIRECTION: str
+    OBJ_2_METRIC: str
+    OBJ_2_SCALING: Callable
+    OBJ_2_DIRECTION: str
+    N_PARALLEL_GPU_JOBS: int    # recommended: = number of GPUs
+    N_PARALLEL_CPU_JOBS: int    # recommended: >= 1
+    N_TRIALS: int
+    IMPLEMENTATION_FILE: pathlib.Path
+    CALL_ACCURACY_METRICS: Literal["once", "per_inner_fold", "never"]
+    GET_ACCURACY_METRICS_USE_GPU: bool
+    CALL_HARDWARE_METRICS: Literal["once", "per_inner_fold", "never"]
+    GET_HARDWARE_METRICS_USE_GPU: bool
+
+    # ----------------------------------------------
+    # - Abstract methods to be implemented by user -
+    # ----------------------------------------------
+
+    @classmethod
+    @abc.abstractmethod
+    def _sample_search_space(cls, trial: optuna.Trial) -> Dict[str, Any]:
+        """
+        Sample the parameters to optimize from the search space.
+
+        This is called once in init_trial(), and most probably in user
+        implementations of get_hardware_metrics and get_accuracy_metrics.
+
+        Parameters
+        ----------
+        trial: optuna.Trial
+            Optuna trial object.
+
+        Returns
+        -------
+        params: Dict[str, Any]
+            Dictionary of parameter names and their values.
+        """
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def get_accuracy_metrics(cls, trial: optuna.Trial,
+                             inner_fold: int) -> AccuracyMetrics:
+        """
+        Calculate the accuracy metrics for a given trial and inner fold.
+
+        If your implementation benefits from a GPU, set
+        GET_ACCURACY_METRICS_USE_GPU=True.
+
+        This is called depending on the value of CALL_ACCURACY_METRICS:
+            "once": called once, independently of inner_fold. If
+                    CALL_HARDWARE_METRICS=="once", get_hardware_metrics() is
+                    called once after the execution of get_accuracy_metrics()
+                    is complete.
+            "per_inner_fold": called once per inner_fold. If
+                              CALL_HARDWARE_METRICS=="per_inner_fold",
+                              get_hardware_metrics() is called for each fold
+                              after the execution of the corresponding
+                              get_accuracy_metrics() is complete.
+            "never": not called.
+
+        Note: to share information between get_accuracy_metrics() and
+        get_hardware_metrics(), save information to file using pickle, csv,
+        json, ...
+
+        Parameters
+        ----------
+        trial: optuna.Trial
+            Optuna trial object.
+
+        Returns
+        -------
+        accuracy_metrics: AccuracyMetrics
+            AccuracyMetrics object.
+        """
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def get_hardware_metrics(cls, trial: optuna.Trial,
+                             inner_fold: int) -> HardwareMetrics:
+        """
+        Calculate the hardware metrics for a given trial and inner fold.
+
+        If your implementation benefits from a GPU, set
+        GET_HARDWARE_METRICS_USE_GPU=True.
+
+        This is called depending on the value of CALL_HARDWARE_METRICS:
+            "once": called once, independently of inner_fold. If
+                    CALL_ACCURACY_METRICS=="once", get_hardware_metrics() is
+                    called once after the execution of get_accuracy_metrics()
+                    is complete.
+            "per_inner_fold": called once per inner_fold. If
+                              CALL_ACCURACY_METRICS=="per fold",
+                              get_hardware_metrics() is called for each fold
+                              after the execution of the corresponding
+                              get_accuracy_metrics() is complete.
+            "never": not called.
+
+        Note: to share information between get_accuracy_metrics() and
+        get_hardware_metrics(), save information to file using pickle, csv,
+        json, ...
+
+        Parameters
+        ----------
+        trial: optuna.Trial
+            Optuna trial object.
+
+        Returns
+        -------
+        hardware_metrics: HardwareMetrics
+            HardwareMetrics object.
+        """
+        pass
+
+    # -----------------------
+    # - Pre-defined methods -
+    # -----------------------
+
+    @classmethod
+    def setup(cls):
+        """
+        Setup a model study.
+
+        A model study is a collection of individual studies, which each
+        represent one outer fold of a nested cross-validation process. Nested
+        cross-validation is used to evaluate the generalization of the
+        optimization process.
+
+        Example: if the desired number of folds is 5, there will be 5 studies,
+        each leaving out one of the folds for testing and using the remaining
+        4 folds inside the study.
+
+        All data related to the model study are stored in BASE_DIR. All studies
+        are placed in study_storage.db. Each study has a folder where scripts
+        and execution traces are stored.
+        """
+
+        # Create base directory
+        if not os.path.isdir(cls.BASE_DIR):
+            os.mkdir(cls.BASE_DIR)
+        else:
+            raise FileExistsError(f"Base directory {cls.BASE_DIR} already "
+                                  f"exists. Interrupting setup to prevent "
+                                  f"undesired overwrite of existing data.")
+
+        study_storage = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+
+        # One study per outer fold
+        run_study_files = []
+        for outer_fold in range(cls.N_FOLDS):
+            outer_fold_dir = cls.BASE_DIR / f"outer_fold_{outer_fold}"
+            os.mkdir(outer_fold_dir)
+
+            study_name = cls.NAME + "_outerfold_" + str(outer_fold)
+            study = optuna.create_study(storage=study_storage,
+                                        study_name=study_name)
+
+            # Note: Sampler is pickled because it is not stored in
+            # study_storage.
+            sampler_path = outer_fold_dir / "sampler.pickle"
+            with open(sampler_path, "wb") as f:
+                pickle.dump(cls.SAMPLER, f)
+
+            study.set_user_attr("sampler", type(cls.SAMPLER).__name__)
+            study.set_user_attr("outer_fold", outer_fold)
+            study.set_user_attr("study_dir", str(outer_fold_dir.resolve()))
+            study.set_user_attr("sampler_path", str(sampler_path.resolve()))
+
+            cls._create_run_trial_sh(outer_fold_dir, study_storage, study_name,
+                                     sampler_path, outer_fold)
+            run_study_files.append(cls._create_run_study_sh(outer_fold_dir))
+        cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
+
+    @classmethod
+    def init_trial(cls, study: optuna.Study):
+        """
+        Initialize a new trial.
+
+        Trial is obtained from the study object and parameters are sampled from
+        the search space. A new folder is created to store trial data. Finally,
+        the trial is pickled to be accessible by other processes.
+
+        Parameters
+        ----------
+        study: optuna.Study
+            Current study.
+        """
+        new_trial = study.ask()
+
+        # sampled parameters are discarded because they are fixed in the trial
+        # when they are sampled once. Here, we only want to fix the values in
+        # the trial before pickling it.
+        _ = cls._sample_search_space(new_trial)
+
+        # Create folder for trial
+        study_dir = pathlib.Path(study.user_attrs["study_dir"])
+        trial_dir = study_dir / f"trial_{new_trial.number}"
+        new_trial.set_user_attr("trial_dir", str(trial_dir.resolve()))
+        os.mkdir(trial_dir)
+
+        # Pickle trial
+        file_path = study_dir / "current_trial.pickle"
+        with open(file_path, "wb") as file:
+            pickle.dump(new_trial, file)
+
+    @classmethod
+    def save_metrics(cls, trial: optuna.Trial, inner_fold: int,
+                     metrics: Union[AccuracyMetrics, HardwareMetrics]):
+        if isinstance(metrics, AccuracyMetrics):
+            metrics_str = "accuracymetrics"
+        elif isinstance(metrics, HardwareMetrics):
+            metrics_str = "hardwaremetrics"
+        else:
+            raise TypeError(f"Invalid type for metrics: {type(metrics)}. "
+                            f"Should be either AccuracyMetrics or "
+                            f"HardwareMetrics.")
+
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        metrics_path = trial_dir / f"inner_fold_{inner_fold}_{metrics_str}.pickle"
+        pickle.dump(metrics, open(metrics_path, "rb"))
+
+    @classmethod
+    def complete_trial(cls, study: optuna.Study, trial: optuna.Trial):
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        trial.set_user_attr("study_sampler", str(trial.study.sampler))
+
+        n_inner_folds = cls.N_FOLDS - 1
+
+        metrics_dicts = []
+
+        try:
+            for f in range(n_inner_folds):
+                am_path = trial_dir / f"inner_fold_{f}_accuracymetrics.pickle"
+                am = pickle.load(open(am_path, "rb"))
+                hm_path = trial_dir / f"inner_fold_{f}_hardwaremetrics.pickle"
+                hm = pickle.load(open(hm_path, "rb"))
+                cm = CombinedMetrics(am, hm, 0)
+                cm_path = trial_dir / f"inner_fold_{f}_combinedmetrics.pickle"
+                pickle.dump(cm, open(cm_path, "wb"))
+                d = am.as_dict()
+                d.update(hm.as_dict())
+                d.update(cm.as_dict())
+                d["inner_fold"] = f
+                metrics_dicts.append(d)
+        except FileNotFoundError:
+            # If there are problems with the energy measurements, trial is failed
+            # and should be ignored in post-processing.
+            study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            return None
+
+        df = pd.DataFrame.from_records(metrics_dicts)
+        df.to_csv(trial_dir / "metrics.csv")
+
+        obj_1_value = df[cls.OBJ_1_METRIC].mean()
+        obj_1_value_scaled = cls.OBJ_1_SCALING(obj_1_value)
+
+        obj_2_value = df[cls.OBJ_2_METRIC].mean()
+        obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
+
+        study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
+
+    @classmethod
+    def get_outer_fold(cls, study: optuna.Study) -> int:
+        return int(study.user_attrs["outer_fold"])
+
+    @classmethod
+    def get_trial_dir(cls, trial: optuna.Trial) -> pathlib.Path:
+        return pathlib.Path(trial.user_attrs["trial_dir"])
+
+    @classmethod
+    def __init_subclass__(cls):
+        # Adapted from https://stackoverflow.com/a/55544173
+        required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
+                                    "N_GPUS", "N_TRIALS", "IMPLEMENTATION_FILE"]
+        for var in required_class_variables:
+            if not hasattr(cls, var):
+                raise NotImplementedError(f"Class {cls} lacks required '{var}'"
+                                          f" class attribute.")
+
+    @classmethod
+    def _create_run_trial_sh(cls, target_dir: pathlib.Path,
+                             study_storage: str, study_name: str,
+                             sampler_path: pathlib.Path, outer_fold: int):
+        """
+        Generate run_trial.sh script in target_dir.
+        """
+        datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        n_total_jobs = cls.N_PARALLEL_CPU_JOBS + cls.N_PARALLEL_CPU_JOBS
+        trial_path = target_dir / "current_trial.pickle"
+
+        lines = ["#!/bin/bash",
+                 "",
+                 "# NOTE: This script was automatically generated by",
+                 f"# {cls.__name__}._create_run_trial_sh() on {datetime_str}",
+                 "",
+                 f"echo 'Run trial'",
+                 f"export PYTHONPATH='{os.environ['PYTHONPATH']}'",
+                 "",
+                 "# Initialize trial",
+                 f"python {cls.IMPLEMENTATION_FILE} init_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()}",
+                 "",
+                 "# Configure task spooler",
+                 f"# {cls.N_PARALLEL_CPU_JOBS} CPU jobs + {cls.N_PARALLEL_GPU_JOBS} GPU jobs = {n_total_jobs} total jobs",
+                 f"ts -S {n_total_jobs}",
+                 "ts --set_gpu_free_perc 80",
+                 "ts -C",
+                 "",
+                 "# Queue jobs"]
+
+        get_accuracy_metrics_gpu_int = 1 if cls.GET_ACCURACY_METRICS_USE_GPU else 0
+        get_hardware_metrics_gpu_int = 1 if cls.GET_ACCURACY_METRICS_USE_GPU else 0
+        job_names = []
+
+        # Call once
+        if cls.CALL_ACCURACY_METRICS == "once":
+            job_names.append(f"job_{len(job_names)}")
+            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_accuracy_metrics -t {trial_path})"]
+
+        if cls.CALL_HARDWARE_METRICS == "once":
+            job_names.append(f"job_{len(job_names)}")
+            if cls.CALL_ACCURACY_METRICS == "once":
+                # Wait for last get_accuracy_metrics job to complete.
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path})"]
+            else:
+                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path})"]
+
+        # Call per_inner_fold
+        n_inner_folds = cls.N_FOLDS-1
+        for inner_fold in range(n_inner_folds):
+            if cls.CALL_ACCURACY_METRICS == "per_inner_fold":
+                job_names.append(f"job_{len(job_names)}")
+                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_accuracy_metrics -t {trial_path} -i {inner_fold})"]
+
+            if cls.CALL_HARDWARE_METRICS == "per_inner_fold":
+                job_names.append(f"job_{len(job_names)}")
+                if cls.CALL_ACCURACY_METRICS == "per_inner_fold":
+                    # Wait for last get_accuracy_metrics job to complete.
+                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+                else:
+                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.IMPLEMENTATION_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+
+        # Wait for all jobs to complete
+        lines += [""]
+        for job_name in job_names:
+            lines += [f"ts -w ${job_name}"]
+
+        lines += ["",
+                  "# Complete trial",
+                  f"python {cls.IMPLEMENTATION_FILE} complete_trial",
+                  "",
+                  "echo 'Trial complete.'"]
+
+        file_path = target_dir / "run_trial.sh"
+
+        with open(file_path, "w") as f:
+            f.writelines([line + "\n" for line in lines])
+
+        return file_path
+
+    @classmethod
+    def _create_run_study_sh(cls, target_dir: pathlib.Path):
+        datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        lines = ["#!/bin/bash",
+                 "",
+                 "# NOTE: This script was automatically generated by",
+                 f"# {cls.__name__}._create_run_study_sh() on {datetime_str}",
+                 "",
+                 f"echo 'Run study'",
+                 "",
+                 f"for i in {{0..{cls.N_TRIALS-1}}}",
+                 "do",
+                 "    bash run_trial.sh",
+                 "done",
+                 "",
+                 "echo 'Study complete.'"]
+
+        file_path = target_dir / "run_study.sh"
+
+        with open(file_path, "w") as f:
+            f.writelines([line + "\n" for line in lines])
+
+        return file_path
+
+    @classmethod
+    def _create_run_model_study_sh(cls, target_dir: pathlib.Path,
+                                   run_study_paths: List[pathlib.Path]):
+        datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        lines = ["#!/bin/bash",
+                 "",
+                 "# NOTE: This script was automatically generated by",
+                 f"# {cls.__name__}._create_run_model_study_sh() on {datetime_str}",
+                 "",
+                 f"echo 'Run model study'",
+                 ""]
+
+        for p in run_study_paths:
+            lines += [f"bash {p.resolve()}"]
+
+        lines += ["",
+                  "echo 'Model study complete.'"]
+
+        file_path = target_dir / "run_model_study.sh"
+
+        with open(target_dir / "run_model_study.sh", "w") as f:
+            f.writelines([line + "\n" for line in lines])
+
+        return file_path
+
+    # ----------------------------------
+    # - Command-line interface methods -
+    # ----------------------------------
+
+    @classmethod
+    def cli_entry_point(cls):
+        """
+        Entry point for the command-line interface.
+
+        The file where the AbstractModelStudy is implemented must be executable
+        as a script:
+
+        ```
+        class MyModelStudy(AbstractModelStudy):
+            @classmethod
+            def run_before_all_folds(cls):
+                pass
+
+            @classmethod
+            def run_fold(cls, fold):
+                pass
+
+            @classmethod
+            def run_after_all_folds(cls):
+                pass
+
+
+        if __name__ == "__main__":
+            MyModelStudy.cli_entry_point()
+        ```
+        """
+        # init_trial()
+        init_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
+                                           type=str, required=True),
+                           click.Option(["-n", "--study-name", "study_name"],
+                                           type=str, required=True),
+                           click.Option(["-s", "--sampler_path", "sampler_path"],
+                               type=str, required=True)
+                           ]
+        init_trial_cmd = click.Command("init_trial",
+                                       callback=cls._cli_init_trial,
+                                       params=init_trial_params)
+
+        # get_hardware_metrics()
+        get_hardware_metrics_params = [
+            click.Option(["-t", "--trial-path", "trial_path"],
+                         type=str, required=True),
+            click.Option(["-i", "--inner-fold", "inner_fold"],
+                         type=int, required=False)]
+        get_hardware_metrics_cmd = click.Command("get_hardware_metrics",
+                                            callback=cls._cli_get_hardware_metrics,
+                                            params=get_hardware_metrics_params)
+
+        # get_accuracy_metrics()
+        get_accuracy_metrics_params = [
+            click.Option(["-t", "--trial-path", "trial_path"],
+                         type=str, required=True),
+            click.Option(["-i", "--inner-fold", "inner_fold"],
+                         type=int, required=False)]
+        get_accuracy_metrics_cmd = click.Command("get_accuracy_metrics",
+                                            callback=cls._cli_get_accuracy_metrics,
+                                            params=get_accuracy_metrics_params)
+
+        # setup()
+        setup_params = []
+        setup_cmd = click.Command("setup",
+                                  callback=cls._cli_setup,
+                                  params=setup_params)
+
+        # complete_trial()
+        complete_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
+                                           type=str, required=True),
+                           click.Option(["-n", "--study-name", "study_name"],
+                                           type=str, required=True),
+                                 click.Option(
+                                     ["-t", "--trial-path", "trial_path"],
+                                     type=str, required=True)
+                           ]
+        complete_trial_cmd = click.Command("complete_trial",
+                                       callback=cls._cli_complete_trial,
+                                       params=complete_trial_params)
+
+        # Group all commands
+        group = click.Group(commands=[init_trial_cmd,
+                                      get_hardware_metrics_cmd,
+                                      get_accuracy_metrics_cmd,
+                                      setup_cmd,
+                                      complete_trial_cmd])
+        group()
+
+    @classmethod
+    def _cli_setup(cls):
+        """
+        Command-line entry point for the function setup().
+        """
+        cls.setup()
+
+    @classmethod
+    def _cli_init_trial(cls, study_storage_url: str, study_name: str,
+                        sampler_path: str):
+        """
+        Command-line entry point for the function init_trial().
+
+        Parameters
+        ----------
+        study_storage_url: str
+            URL to study storage.
+        study_name: str
+            Study name.
+        sampler_path: str
+            Path to pickled optuna.Sampler.
+        """
+        sampler = pickle.load(open(sampler_path, "rb"))
+        study = optuna.load_study(storage=study_storage_url,
+                                  study_name=study_name,
+                                  sampler=sampler)
+        cls.init_trial(study)
+
+    @classmethod
+    def _cli_get_hardware_metrics(cls, trial_path: str, inner_fold: int):
+        """
+        Command-line entry point for the functions get_hardware_metrics() and
+        save_metrics().
+
+        Parameters
+        ----------
+        [...]
+        """
+        trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
+        hm = cls.get_hardware_metrics(trial, inner_fold)
+        cls.save_metrics(trial, inner_fold, hm)
+
+    @classmethod
+    def _cli_get_accuracy_metrics(cls, trial_path: str, inner_fold: int):
+        """
+        Command-line entry point for the functions get_accuracy_metrics() and
+        save_metrics().
+
+        Parameters
+        ----------
+        [...]
+        """
+        trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
+        am = cls.get_accuracy_metrics(trial, inner_fold)
+        cls.save_metrics(trial, inner_fold, am)
+
+    @classmethod
+    def _cli_complete_trial(cls, study_storage_url: str, study_name: str,
+                            trial_path: str):
+        """
+        Command-line entry point for the function complete_trial().
+        """
+        study = optuna.load_study(storage=study_storage_url,
+                                  study_name=study_name)
+        trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
+        cls.complete_trial(study, trial)
+
+
