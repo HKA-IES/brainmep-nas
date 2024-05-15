@@ -8,10 +8,10 @@ Brain-MEP Project.
 **Note: this package is a work in progress**
 
 ## Install it from the repository
-Tested with Python 3.11.
+Tested with Python 3.12.
 
 ```
-pip install git+https://github.com/jonathanlarochelle/brainmep-nas-private
+pip install git+https://github.com/jonathanlarochelle/brainmep-nas
 ```
 
 ## Usage
@@ -47,3 +47,6 @@ documentation is unclear.
 
 ## Publication
 This package was used and characterized in the publication "XYZ"
+
+## License
+This project is licensed under GNU General Public License v3.0.
