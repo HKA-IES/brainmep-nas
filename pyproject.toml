@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brainmepnas"
+version = "0.0.1"
+authors = [{name = "Jonathan Larochelle", email = "jonathan.larochelle@imtek.uni-freiburg.de"}, ]
+description = "Utilities to run neural architecture search (NAS) processes as part of the Brain-MEP project."
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "numpy",
+    "scikit-learn",
+]
+license = {file = "LICENSE"}
+
+[tool.setuptools.packages.find]
+include = ["brainmepnas*"]
+
+[project.urls]
+Homepage = "https://github.com/jonathanlarochelle/brainmep-nas-private"
+Issues = "https://github.com/jonathanlarochelle/brainmep-nas-private/issues"
