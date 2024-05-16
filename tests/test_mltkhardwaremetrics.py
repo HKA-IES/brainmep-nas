@@ -23,10 +23,19 @@ class TestMltkHardwareMetrics:
         """
         hm = MltkHardwareMetrics(self.GOOD_TFLITE_MODEL)
 
-        assert 0 < hm.energy < 0.001
-        assert 0 < hm.time < 1
-        assert 0 < hm.ram_memory < 256000
-        assert 0 < hm.flash_memory < 1500000
+        assert hm.clock_frequency == pytest.approx(78e6)
+        assert hm.tflite_size == 16000
+        assert hm.runtime_memory_size == 24388
+        assert hm.inference_ops == 1378052
+        assert hm.inference_macs == 671184
+        assert hm.inference_cpu_cycles == 264240
+        assert hm.inference_accelerator_cycles == 628310
+        assert hm.inference_cpu_utilization == pytest.approx(39.58, abs=0.01)
+        assert hm.j_per_op == pytest.approx(1.09e-10, abs=0.01e-10)
+        assert hm.j_per_mac == pytest.approx(2.23e-10, abs=0.01e-10)
+        assert hm.op_per_s == pytest.approx(161e6, abs=1e6)
+        assert hm.mac_per_s == pytest.approx(78e6, abs=1e6)
+        assert hm.inference_per_sec == pytest.approx(116, abs=1)
         assert hm.profiling_results is not None
 
     def test_bad_tflite_model(self):

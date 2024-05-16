@@ -15,15 +15,11 @@ class TestHardwareMetrics:
         """
         HardwareMetrics initializes properly when all params are specified.
         """
-        hm = HardwareMetrics(energy=1,
-                             time=2,
-                             ram_memory=3,
-                             flash_memory=4)
+        hm = HardwareMetrics(inference_time=1,
+                             inference_energy=2)
 
-        assert hm.energy == 1
-        assert hm.time == 2
-        assert hm.ram_memory == 3
-        assert hm.flash_memory == 4
+        assert hm.inference_time == 1
+        assert hm.inference_energy == 2
 
     def test_init_missing_values(self):
         """
@@ -36,14 +32,10 @@ class TestHardwareMetrics:
         """
         Function as_dict() returns a dictionary with the values.
         """
-        hm = HardwareMetrics(energy=1,
-                             time=2,
-                             ram_memory=3,
-                             flash_memory=4)
+        hm = HardwareMetrics(inference_time=1,
+                             inference_energy=2)
 
-        expected_dict = {"energy": 1,
-                         "time": 2,
-                         "ram_memory": 3,
-                         "flash_memory": 4}
+        expected_dict = {"inference_time": 1,
+                         "inference_energy": 2}
 
         assert hm.as_dict() == expected_dict

@@ -14,24 +14,18 @@ class HardwareMetrics:
     """
     Store hardware metrics.
 
+    Note: The attributes defined here are only the bare minimum required to
+    characterize the hardware performance of a model on a specific hardware.
+
     Attributes
     ----------
-    energy: float
-        Energy for a single inference, in joules (J).
-    time: float
+    inference_time: float
         Time for a single inference, in seconds (s).
-    ram_memory: int
-        RAM memory required for the model, in bytes (B).
-    flash_memory: int
-        Flash memory required for the model, in bytes (B).
+    inference_energy: float
+        Energy for a single inference, in joules (J).
     """
-
-    # TODO: Add more details: frequency, voltage, current, hardware, etc.
-
-    energy: float       # in joules (J)
-    time: float         # in seconds (s)
-    ram_memory: int     # in bytes (B)
-    flash_memory: int   # in bytes (B)
+    inference_time: float
+    inference_energy: float
 
     def as_dict(self) -> dict:
         """
