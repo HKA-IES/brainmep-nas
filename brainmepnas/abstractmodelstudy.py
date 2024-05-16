@@ -5,7 +5,7 @@ import abc
 import pathlib
 import os
 import pickle
-from typing import Callable, Dict, Union, List, Any, Literal
+from typing import Callable, Dict, Union, List, Any, Literal, Optional
 import datetime
 
 # import third-party modules
@@ -93,7 +93,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int = None) -> AccuracyMetrics:
+                              inner_fold: Optional[int] = None) -> AccuracyMetrics:
         """
         Calculate the accuracy metrics for a given trial and inner fold. This
         function is called by the public get_accuracy_metrics(), which
@@ -122,7 +122,7 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
-        inner_fold: int
+        inner_fold: int, optional
             Inner fold.
 
         Returns
@@ -134,7 +134,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int = None) -> HardwareMetrics:
+                              inner_fold: Optional[int] = None) -> HardwareMetrics:
         """
         Calculate the hardware metrics for a given trial and inner fold. This
         function is called by the public get_hardware_metrics(), which
@@ -163,13 +163,39 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
-        inner_fold: int
+        inner_fold: int, optional
             Inner fold.
 
         Returns
         -------
         hardware_metrics: HardwareMetrics
             HardwareMetrics object.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def _get_combined_metrics(cls, accuracy_metrics: AccuracyMetrics,
+                              hardware_metrics: HardwareMetrics) -> CombinedMetrics:
+        """
+        Calculate the combined metrics from provided accuracy and hardware
+        metrics.
+
+        This function is called by the public get_combined_metrics(),
+        which additionally pickles the HardwareMetrics object.
+
+        This is called after processing all folds.
+
+        Parameters
+        ----------
+        accuracy_metrics: AccuracyMetrics
+            AccuracyMetrics object.
+        hardware_metrics: HardwareMetrics
+            HardwareMetrics object
+
+        Returns
+        -------
+        combined_metrics: CombinedMetrics
+            CombinedMetrics object.
         """
         raise NotImplementedError
 
@@ -278,7 +304,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int = None) -> AccuracyMetrics:
+                              inner_fold: Optional[int] = None) -> AccuracyMetrics:
         """
         Calculate and save accuracy metrics for a specific trial and inner fold
         to the trial directory as
@@ -316,7 +342,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int = None) -> HardwareMetrics:
+                              inner_fold: Optional[int] = None) -> HardwareMetrics:
         """
         Calculate and save hardware metrics for a specific trial and inner fold
         to the trial directory as
@@ -338,7 +364,7 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
-        inner_fold: int
+        inner_fold: int, optional
             Inner fold.
 
         Returns
@@ -351,6 +377,40 @@ class AbstractModelStudy(abc.ABC):
         hm_path = trial_dir / f"inner_fold_{inner_fold}_hardware_metrics.pickle"
         pickle.dump(hm, open(hm_path, "wb"))
         return hm
+
+    @classmethod
+    def get_combined_metrics(cls, accuracy_metrics: AccuracyMetrics,
+                             hardware_metrics: HardwareMetrics,
+                             trial: optuna.Trial,
+                             inner_fold: Optional[int] = None) -> CombinedMetrics:
+        """
+        Calculate and save combined metrics from accuracy and hardware metrics
+        to the trial directory as
+        inner_fold_{inner_fold}_hardware_metrics.pickle.
+
+        This is called after processing all folds.
+
+        Parameters
+        ----------
+        accuracy_metrics: AccuracyMetrics
+            AccuracyMetrics object.
+        hardware_metrics: HardwareMetrics
+            HardwareMetrics object
+        trial: optuna.Trial
+            Optuna trial object.
+        inner_fold: int, optional
+            Inner fold.
+
+        Returns
+        -------
+        combined_metrics: CombinedMetrics
+            CombinedMetrics object.
+        """
+        cm = cls._get_combined_metrics(accuracy_metrics, hardware_metrics)
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        cm_path = trial_dir / f"inner_fold_{inner_fold}_combined_metrics.pickle"
+        pickle.dump(cm, open(cm_path, "wb"))
+        return cm
 
     @classmethod
     def complete_trial(cls, study: optuna.Study, trial: optuna.Trial):
