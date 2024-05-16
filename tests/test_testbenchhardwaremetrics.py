@@ -39,10 +39,10 @@ class TestTestbenchHardwareMetrics:
                                       password=remote_testbench_config["credentials"]["password"],
                                       tflite_model_path=self.GOOD_TFLITE_MODEL)
 
-        assert 0 < hm.energy < 0.001
-        assert 0 < hm.time < 1
-        assert 0 < hm.ram_memory < 256000
-        assert 0 < hm.flash_memory < 1500000
+        assert 0 < hm.inference_energy < 0.001
+        assert 0 < hm.inference_time < 1
+        assert 0 < hm.memory_ram < 256000
+        assert 0 < hm.memory_flash < 1500000
         assert hm.nnresults is not None
 
     def test_bad_tflite_model(self, remote_testbench_config):

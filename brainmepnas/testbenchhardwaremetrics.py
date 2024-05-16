@@ -31,9 +31,16 @@ class TestbenchHardwareMetrics(HardwareMetrics):
 
     Attributes
     ----------
+    memory_ram: int
+        Estimated RAM use, in bytes (B).
+    memory_flash: int
+        Flash memory used, in bytes (B).
     nnresults: seizuredetectiontestbench.NNResults
         Results object from the seizure detection testbench.
     """
+
+    memory_ram: int
+    memory_flash: int
 
     nnresults: "NNResults"
 
@@ -65,7 +72,7 @@ class TestbenchHardwareMetrics(HardwareMetrics):
         rt.begin_test_tflite_model(tflite_model_path)
 
         self.nnresults = rt.get_results_test_tflite_model()
-        self.energy = np.mean(self.nnresults.total_energy)
-        self.time = np.mean(self.nnresults.total_duration)
-        self.ram_memory = self.nnresults.memory_ram
-        self.flash_memory = self.nnresults.memory_flash
+        self.inference_energy = np.mean(self.nnresults.total_energy)
+        self.inference_time = np.mean(self.nnresults.total_duration)
+        self.memory_ram = self.nnresults.memory_ram
+        self.memory_flash = self.nnresults.memory_flash
