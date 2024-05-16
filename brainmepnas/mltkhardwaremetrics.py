@@ -7,9 +7,9 @@ import dataclasses
 try:
     from mltk.core import profile_model, ProfilingModelResults
 except ImportError:
-    _has_mltk = False
-else:
-    _has_mltk = True
+    raise ImportError("The mltk package is required to use this class. Install"
+                      " it by executing '$ pip install silabs-mltk[full]'.",
+                      name="silabs-mltk")
 
 # import your own module
 from .hardwaremetrics import HardwareMetrics
@@ -48,12 +48,6 @@ class MltkHardwareMetrics(HardwareMetrics):
         tflite_model_path: str
             Path to .tflite file.
         """
-        if not _has_mltk:
-            raise ImportError("The mltk package is required to use this class."
-                              " Install it by executing "
-                              "'$ pip install silabs-mltk[full]'.",
-                              name="silabs-mltk")
-
         self.profiling_results = profile_model(tflite_model_path,
                                                accelerator="MVP",
                                                return_estimates=True)

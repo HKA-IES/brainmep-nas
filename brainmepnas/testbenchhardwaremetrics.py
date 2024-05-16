@@ -8,9 +8,10 @@ import numpy as np
 try:
     from seizuredetectiontestbench import RemoteTestbench, NNResults
 except ImportError:
-    _has_seizuredetectiontestbench = False
-else:
-    _has_seizuredetectiontestbench = True
+    raise ImportError("The seizuredetectiontestbench package is required to "
+                      "use this class. Install it by executing "
+                      "'$ pip install git+https://{USERNAME}@bitbucket.org/precisis/seizure_detection_testbench.git'.",
+                      name="seizuredetectiontestbench")
 
 # import your own module
 from .hardwaremetrics import HardwareMetrics
@@ -60,13 +61,6 @@ class TestbenchHardwareMetrics(HardwareMetrics):
         tflite_model_path: str
             Path to .tflite file.
         """
-        if not _has_seizuredetectiontestbench:
-            raise ImportError("The seizuredetectiontestbench package is "
-                              "required to use this class."
-                              " Install it by executing "
-                              "'$ pip install git+https://{USERNAME}@bitbucket.org/precisis/seizure_detection_testbench.git'.",
-                              name="seizuredetectiontestbench")
-
         rt = RemoteTestbench(host, user, password)
         rt.begin_test_tflite_model(tflite_model_path)
 
