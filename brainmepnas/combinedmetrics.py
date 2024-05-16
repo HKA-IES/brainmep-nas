@@ -16,12 +16,22 @@ class CombinedMetrics:
     """
     Store metrics which are obtained from combination of accuracy and hardware
     metrics.
+
+    Attributes
+    ----------
+    accuracy_metrics: AccuracyMetrics
+        AccuracyMetrics object used as input.
+    hardware_metrics: HardwareMetrics
+        HardwareMetrics object used as input.
+    stimulation_energy: float
+        Energy required for a single stimulation, in joules (J).
+    # TODO: Add combined metrics attributes.
     """
 
     # Input data
     accuracy_metrics: AccuracyMetrics
     hardware_metrics: HardwareMetrics
-    stimulation_energy: float       # in joules (J)
+    stimulation_energy: float
 
     # Combined metrics
     busy_cycle: float       # proportion of the time between cycles which is
@@ -38,9 +48,17 @@ class CombinedMetrics:
                  hardware_metrics: HardwareMetrics,
                  stimulation_energy: float):
         """
-        :param accuracy_metrics: AccuracyMetrics instance.
-        :param hardware_metrics: HardwareMetrics instance.
-        :param stimulation_energy: energy per stimulation, in joules.
+        Calculate metrics which are a combination of accuracy and hardware
+        metrics.
+
+        Parameters
+        ----------
+        accuracy_metrics: AccuracyMetrics
+            AccuracyMetrics object.
+        hardware_metrics: HardwareMetrics
+            HardwareMetrics object.
+        stimulation_energy: float
+            Energy for a single brain stimulation event, in joules (J).
         """
         am = accuracy_metrics
         hm = hardware_metrics

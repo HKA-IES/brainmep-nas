@@ -6,7 +6,7 @@
 import pytest
 
 # import your own module
-from brainmepnas import MltkHardwareMetrics
+from brainmepnas.mltkhardwaremetrics import MltkHardwareMetrics
 
 
 class TestMltkHardwareMetrics:

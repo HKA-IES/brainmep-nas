@@ -7,7 +7,7 @@ import configparser
 import pytest
 
 # import your own module
-from brainmepnas import TestbenchHardwareMetrics
+from brainmepnas.testbenchhardwaremetrics import TestbenchHardwareMetrics
 
 
 class TestTestbenchHardwareMetrics:

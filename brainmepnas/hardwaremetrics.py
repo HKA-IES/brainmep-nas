@@ -13,7 +13,20 @@ import numbers
 class HardwareMetrics:
     """
     Store hardware metrics.
+
+    Attributes
+    ----------
+    energy: float
+        Energy for a single inference, in joules (J).
+    time: float
+        Time for a single inference, in seconds (s).
+    ram_memory: int
+        RAM memory required for the model, in bytes (B).
+    flash_memory: int
+        Flash memory required for the model, in bytes (B).
     """
+
+    # TODO: Add more details: frequency, voltage, current, hardware, etc.
 
     energy: float       # in joules (J)
     time: float         # in seconds (s)

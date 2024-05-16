@@ -13,7 +13,7 @@ else:
     _has_seizuredetectiontestbench = True
 
 # import your own module
-from ..hardwaremetrics import HardwareMetrics
+from .hardwaremetrics import HardwareMetrics
 
 
 @dataclasses.dataclass
@@ -24,6 +24,14 @@ class TestbenchHardwareMetrics(HardwareMetrics):
     Requires the optional dependency "seizure-detection-testbench". Install it
     by executing
     '$ pip install git+https://{USERNAME}@bitbucket.org/precisis/seizure_detection_testbench.git'.
+
+    Note: The Seizure Detection Testbench is a private tool of the BrainMEP
+    project and there are currently no plans of making it publicly available.
+
+    Attributes
+    ----------
+    nnresults: seizuredetectiontestbench.NNResults
+        Results object from the seizure detection testbench.
     """
 
     nnresults: "NNResults"
@@ -31,10 +39,26 @@ class TestbenchHardwareMetrics(HardwareMetrics):
     def __init__(self, host: str, user: str, password: str,
                  tflite_model_path: str):
         """
-        :param host: IP address of Testbench.
-        :param user: User
-        :param password: Password.
-        :param tflite_model_path: path to .tflite file.
+        Estimate the hardware performance of a TFLite model from the
+        Seizure Detection Testbench.
+
+        Note: The Seizure Detection Testbench is a private tool of the BrainMEP
+        project and there are currently no plans of making it publicly
+        available.
+
+        Parameters
+        ----------
+        host: str
+            IP address of remote testbench.
+            Example: "192.0.2.1"
+        user: str
+            User of remote testbench.
+        password: str
+            Password of remote testbench for user in plaintext. Make sure to
+            never write the password in any file which could be made public
+            through external or public versioning tools.
+        tflite_model_path: str
+            Path to .tflite file.
         """
         if not _has_seizuredetectiontestbench:
             raise ImportError("The seizuredetectiontestbench package is "

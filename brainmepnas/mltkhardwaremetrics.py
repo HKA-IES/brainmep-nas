@@ -12,7 +12,7 @@ else:
     _has_mltk = True
 
 # import your own module
-from ..hardwaremetrics import HardwareMetrics
+from .hardwaremetrics import HardwareMetrics
 
 
 @dataclasses.dataclass
@@ -23,19 +23,30 @@ class MltkHardwareMetrics(HardwareMetrics):
 
     Requires the optional dependency "silabs-mltk[full]". Install it by
     executing '$ pip install silabs-mltk[full]'.
+
+    Attributes
+    ----------
+    profiling_results: mltk.core.ProfilingModelResults
+        Results object from the MLTK profiler.
     """
 
     profiling_results: "ProfilingModelResults"
 
     def __init__(self, tflite_model_path: str):
         """
+        Estimate the hardware performance of a TFLite model from the
+        Silicon Labs MLTK Model Profiler.
+
         Note: loading the MLTK estimators in memory can take up to 200 seconds
         depending on the layers of the model. The problem seems to lie with
         onnx>=1.11. When the estimators are loaded once in a session, they
         do not need to be loaded again, so energy estimation runs much faster
         for further calls to this class.
 
-        :param tflite_model_path: path to .tflite file.
+        Parameters
+        ----------
+        tflite_model_path: str
+            Path to .tflite file.
         """
         if not _has_mltk:
             raise ImportError("The mltk package is required to use this class."
