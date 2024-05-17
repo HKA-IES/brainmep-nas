@@ -241,7 +241,9 @@ class AbstractModelStudy(abc.ABC):
 
             study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
             study = optuna.create_study(storage=study_storage,
-                                        study_name=study_name)
+                                        study_name=study_name,
+                                        directions=[cls.OBJ_1_DIRECTION,
+                                                    cls.OBJ_2_DIRECTION])
 
             # Note: Sampler is pickled because it is not stored in
             # study_storage.
@@ -254,9 +256,9 @@ class AbstractModelStudy(abc.ABC):
             study.set_user_attr("study_dir", str(outer_fold_dir.resolve()))
             study.set_user_attr("sampler_path", str(sampler_path.resolve()))
 
-            cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
+            run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
                                      sampler_path, outer_fold)
-            run_study_sh_path = cls._create_run_study_sh(outer_fold_dir)
+            run_study_sh_path = cls._create_run_study_sh(outer_fold_dir, run_trial_sh_path)
             run_study_files.append(run_study_sh_path)
         cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
 
@@ -436,17 +438,17 @@ class AbstractModelStudy(abc.ABC):
 
         metrics_dicts = []
 
-        for f in range(n_inner_folds):
-            if cls.GET_ACCURACY_METRICS_CALL == "once":
-                am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
-                am = pickle.load(open(am_path, "rb"))
-            elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
-                am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
-                am = pickle.load(open(am_path, "rb"))
-            else:
-                am = None
+        try:
+            for f in range(n_inner_folds):
+                if cls.GET_ACCURACY_METRICS_CALL == "once":
+                    am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
+                    am = pickle.load(open(am_path, "rb"))
+                elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
+                    am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
+                    am = pickle.load(open(am_path, "rb"))
+                else:
+                    am = None
 
-            try:
                 if cls.GET_HARDWARE_METRICS_CALL == "once":
                     hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
                     hm = pickle.load(open(hm_path, "rb"))
@@ -455,25 +457,24 @@ class AbstractModelStudy(abc.ABC):
                     hm = pickle.load(open(hm_path, "rb"))
                 else:
                     hm = None
-            except FileNotFoundError:
-                # If there are problems with the energy measurements, trial
-                # is failed and should be ignored in post-processing.
-                study.tell(trial, state=optuna.trial.TrialState.FAIL)
-                return None
 
-            if am is not None and hm is not None:
-                cm = cls.get_combined_metrics(trial, f, am, hm)
-            else:
-                cm = None
+                if am is not None and hm is not None:
+                    cm = cls.get_combined_metrics(trial, f, am, hm)
+                else:
+                    cm = None
 
-            d = {"inner_fold": f}
-            if am is not None:
-                d.update(am.as_dict())
-            if hm is not None:
-                d.update(hm.as_dict())
-            if cm is not None:
-                d.update(cm.as_dict())
-            metrics_dicts.append(d)
+                d = {"inner_fold": f}
+                if am is not None:
+                    d.update(am.as_dict())
+                if hm is not None:
+                    d.update(hm.as_dict())
+                if cm is not None:
+                    d.update(cm.as_dict())
+                metrics_dicts.append(d)
+        except FileNotFoundError:
+            # Fail trial if one of the expected metrics file is absent.
+            study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            return None
 
         df = pd.DataFrame.from_records(metrics_dicts)
         df.to_csv(trial_dir / "metrics.csv")
@@ -552,7 +553,7 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def _create_run_trial_sh(cls, target_dir: pathlib.Path,
                              study_storage: str, study_name: str,
-                             sampler_path: pathlib.Path, outer_fold: int):
+                             sampler_path: pathlib.Path, outer_fold: int) -> pathlib.Path:
         """
         Generate run_trial.sh script in target_dir.
         """
@@ -566,7 +567,6 @@ class AbstractModelStudy(abc.ABC):
                  f"# {cls.__name__}._create_run_trial_sh() on {datetime_str}",
                  "",
                  f"echo 'Run trial'",
-                 f"export PYTHONPATH='{os.environ['PYTHONPATH']}'",
                  "",
                  "# Initialize trial",
                  f"python {cls.THIS_FILE} init_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()}",
@@ -586,30 +586,30 @@ class AbstractModelStudy(abc.ABC):
         # Call once
         if cls.GET_ACCURACY_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path})"]
+            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()})"]
 
         if cls.GET_HARDWARE_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
             if cls.GET_ACCURACY_METRICS_CALL == "once":
                 # Wait for last get_accuracy_metrics job to complete.
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path})"]
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
             else:
-                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path})"]
+                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
 
         # Call per_inner_fold
         n_inner_folds = cls.N_FOLDS-1
         for inner_fold in range(n_inner_folds):
             if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path} -i {inner_fold})"]
+                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} -i {inner_fold})"]
 
             if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
                 if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                     # Wait for last get_accuracy_metrics job to complete.
-                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
                 else:
-                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
 
         # Wait for all jobs to complete
         lines += [""]
@@ -618,7 +618,7 @@ class AbstractModelStudy(abc.ABC):
 
         lines += ["",
                   "# Complete trial",
-                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -t {trial_path}",
+                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -t {trial_path.resolve()}",
                   "",
                   "echo 'Trial complete.'"]
 
@@ -630,7 +630,8 @@ class AbstractModelStudy(abc.ABC):
         return file_path
 
     @classmethod
-    def _create_run_study_sh(cls, target_dir: pathlib.Path):
+    def _create_run_study_sh(cls, target_dir: pathlib.Path,
+                             run_trial_path: pathlib.Path):
         datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         lines = ["#!/bin/bash",
@@ -643,7 +644,7 @@ class AbstractModelStudy(abc.ABC):
                  f"# {cls.N_TRIALS} trials.",
                  f"for i in {{0..{cls.N_TRIALS-1}}}",
                  "do",
-                 "    bash run_trial.sh",
+                 f"    bash {run_trial_path.resolve()}",
                  "done",
                  "",
                  "echo 'Study complete.'"]

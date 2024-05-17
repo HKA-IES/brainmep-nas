@@ -4,6 +4,7 @@
 import os.path
 import shutil
 import pickle
+from typing import Type
 
 # import third-party modules
 import pytest
@@ -16,13 +17,17 @@ from dummymodelstudy1 import DummyModelStudy1
 
 class TestAbstractModelStudy:
     @staticmethod
-    def delete_model_study_directory(model_study: AbstractModelStudy):
+    def delete_model_study_directory(model_study: Type[AbstractModelStudy]):
         """
         Delete the directory of an AbstractModelStudy implementation, if it
         exists.
         """
         if os.path.isdir(model_study.BASE_DIR):
             shutil.rmtree(model_study.BASE_DIR)
+
+    @pytest.fixture(scope="session", autouse=True)
+    def run_before_all_tests(self):
+        self.delete_model_study_directory(DummyModelStudy1)
 
     def test_abstract_class_not_instantiable(self):
         with pytest.raises(RuntimeError):
@@ -171,12 +176,70 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(DummyModelStudy1)
 
     def test_complete_trial(self):
-        raise NotImplementedError
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = DummyModelStudy1.init_trial(study)
+        trial_dir = DummyModelStudy1.get_trial_dir(trial)
+
+        DummyModelStudy1.get_hardware_metrics(trial)
+        DummyModelStudy1.get_accuracy_metrics(trial, 0)
+        DummyModelStudy1.get_accuracy_metrics(trial, 1)
+
+        assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
+        DummyModelStudy1.complete_trial(study, trial)
+        assert study.trials[-1].state == optuna.trial.TrialState.COMPLETE
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
+
+    def test_complete_trial_metrics_missing(self):
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = DummyModelStudy1.init_trial(study)
+        trial_dir = DummyModelStudy1.get_trial_dir(trial)
+
+        #DummyModelStudy1.get_hardware_metrics(trial)
+        #DummyModelStudy1.get_accuracy_metrics(trial, 0)
+        #DummyModelStudy1.get_accuracy_metrics(trial, 1)
+
+        assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
+        DummyModelStudy1.complete_trial(study, trial)
+        assert study.trials[-1].state == optuna.trial.TrialState.FAIL
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
 
     def test_get_outer_fold(self):
         raise NotImplementedError
 
     def test_get_trial_dir(self):
+        raise NotImplementedError
+
+    def test_run_trial_sh(self):
+        raise NotImplementedError
+
+    def test_run_study_sh(self):
+        raise NotImplementedError
+
+    def test_run_model_study_sh(self):
         raise NotImplementedError
 
     def test_cli(self):
