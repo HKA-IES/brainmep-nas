@@ -144,6 +144,32 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(DummyModelStudy1)
 
+    def test_get_combined_metrics(self, mocker):
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = DummyModelStudy1.init_trial(study)
+        trial_dir = DummyModelStudy1.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_combined_metrics")
+        mocked_method.return_value = None
+
+        cm = DummyModelStudy1.get_combined_metrics(trial, 1, None, None)
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_1_combined_metrics.pickle", "rb")) == cm
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
+
     def test_complete_trial(self):
         raise NotImplementedError
 

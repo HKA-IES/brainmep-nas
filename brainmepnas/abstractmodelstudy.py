@@ -336,6 +336,8 @@ class AbstractModelStudy(abc.ABC):
         """
         am = cls._get_accuracy_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        if inner_fold is None:
+            inner_fold = "all"
         am_path = trial_dir / f"inner_fold_{inner_fold}_accuracy_metrics.pickle"
         pickle.dump(am, open(am_path, "wb"))
         return am
@@ -374,15 +376,17 @@ class AbstractModelStudy(abc.ABC):
         """
         hm = cls._get_hardware_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        if inner_fold is None:
+            inner_fold = "all"
         hm_path = trial_dir / f"inner_fold_{inner_fold}_hardware_metrics.pickle"
         pickle.dump(hm, open(hm_path, "wb"))
         return hm
 
     @classmethod
-    def get_combined_metrics(cls, accuracy_metrics: AccuracyMetrics,
-                             hardware_metrics: HardwareMetrics,
-                             trial: optuna.Trial,
-                             inner_fold: Optional[int] = None) -> CombinedMetrics:
+    def get_combined_metrics(cls, trial: optuna.Trial,
+                             inner_fold: int,
+                             accuracy_metrics: AccuracyMetrics,
+                             hardware_metrics: HardwareMetrics) -> CombinedMetrics:
         """
         Calculate and save combined metrics from accuracy and hardware metrics
         to the trial directory as
@@ -392,14 +396,14 @@ class AbstractModelStudy(abc.ABC):
 
         Parameters
         ----------
+        trial: optuna.Trial
+            Optuna trial object.
+        inner_fold: int
+            Inner fold.
         accuracy_metrics: AccuracyMetrics
             AccuracyMetrics object.
         hardware_metrics: HardwareMetrics
             HardwareMetrics object
-        trial: optuna.Trial
-            Optuna trial object.
-        inner_fold: int, optional
-            Inner fold.
 
         Returns
         -------
@@ -432,25 +436,44 @@ class AbstractModelStudy(abc.ABC):
 
         metrics_dicts = []
 
-        try:
-            for f in range(n_inner_folds):
+        for f in range(n_inner_folds):
+            if cls.GET_ACCURACY_METRICS_CALL == "once":
+                am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
+                am = pickle.load(open(am_path, "rb"))
+            elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                 am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
                 am = pickle.load(open(am_path, "rb"))
-                hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
-                hm = pickle.load(open(hm_path, "rb"))
-                cm = CombinedMetrics(am, hm, 0)
-                cm_path = trial_dir / f"inner_fold_{f}_combined_metrics.pickle"
-                pickle.dump(cm, open(cm_path, "wb"))
-                d = am.as_dict()
+            else:
+                am = None
+
+            try:
+                if cls.GET_HARDWARE_METRICS_CALL == "once":
+                    hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
+                    hm = pickle.load(open(hm_path, "rb"))
+                elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
+                    hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
+                    hm = pickle.load(open(hm_path, "rb"))
+                else:
+                    hm = None
+            except FileNotFoundError:
+                # If there are problems with the energy measurements, trial
+                # is failed and should be ignored in post-processing.
+                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                return None
+
+            if am is not None and hm is not None:
+                cm = cls.get_combined_metrics(trial, f, am, hm)
+            else:
+                cm = None
+
+            d = {"inner_fold": f}
+            if am is not None:
+                d.update(am.as_dict())
+            if hm is not None:
                 d.update(hm.as_dict())
+            if cm is not None:
                 d.update(cm.as_dict())
-                d["inner_fold"] = f
-                metrics_dicts.append(d)
-        except FileNotFoundError:
-            # If there are problems with the energy measurements, trial is failed
-            # and should be ignored in post-processing.
-            study.tell(trial, state=optuna.trial.TrialState.FAIL)
-            return None
+            metrics_dicts.append(d)
 
         df = pd.DataFrame.from_records(metrics_dicts)
         df.to_csv(trial_dir / "metrics.csv")
