@@ -13,12 +13,19 @@ import numbers
 class HardwareMetrics:
     """
     Store hardware metrics.
-    """
 
-    energy: float       # in joules (J)
-    time: float         # in seconds (s)
-    ram_memory: int     # in bytes (B)
-    flash_memory: int   # in bytes (B)
+    Note: The attributes defined here are only the bare minimum required to
+    characterize the hardware performance of a model on a specific hardware.
+
+    Attributes
+    ----------
+    inference_time: float
+        Time for a single inference, in seconds (s).
+    inference_energy: float
+        Energy for a single inference, in joules (J).
+    """
+    inference_time: float
+    inference_energy: float
 
     def as_dict(self) -> dict:
         """

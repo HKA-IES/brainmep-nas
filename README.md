@@ -23,9 +23,15 @@ shown in examples/.
 - [ ] Metrics calculations
   - [x] AccuracyMetrics - calculates inference accuracy metrics like ROC-AUC, 
 sensitivity, and false detections per hour.
-  - [ ] HardwareMetrics - calculates hardware metrics like energy and latency 
+  - [x] HardwareMetrics - calculates hardware metrics like energy and latency 
 per inference.
-  - [ ] MixedMetrics - calculates metrics which combine accuracy and hardware
+    - [x] MltkHardwareMetrics - HardwareMetrics implementation using the 
+Silicon Labs MLTK Model Profiler.
+    - [x] TestbenchHardwareMetrics - HardwareMetrics implementation using the 
+BrainMEP Seizure Detection Testbench.
+    - [ ] RandomForestHardwareMetrics - HardwareMetrics implementation to 
+estimate or measure the performance of random forest classifiers.
+  - [x] CombinedMetrics - calculates metrics which combine accuracy and hardware
 values like the combined energy for inferences and false detections per hour.
 - [ ] Dataset utilities
   - [ ] Dataset class
