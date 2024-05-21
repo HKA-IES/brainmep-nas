@@ -522,7 +522,6 @@ class AbstractModelStudy(abc.ABC):
         start_time = time.time()
 
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        trial.set_user_attr("study_sampler", str(trial.study.sampler))
 
         n_inner_folds = cls.N_FOLDS - 1
 
