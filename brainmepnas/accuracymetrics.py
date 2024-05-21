@@ -260,11 +260,11 @@ class AccuracyMetrics:
 
         Parameters                                                                                                  
         ----------
-        y_true : int                                                                                                  
-          Array of true labels. Expected values are either 0 (no seizure) or
-          1 (seizure).
-        y_pred : float 
-            Array of predicted labels. Expected values between 0 and 1.
+        y_true : np.ndarray(int)
+            1D array of true labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        y_pred : np.ndarray(float)
+            1D array of predicted labels. Expected values between 0 and 1.
         threshold : str or float
             The threshold to apply. Either a fixed (float) threshold or 
             "max_f_score": for threshold which maximizes the f score.
@@ -303,16 +303,21 @@ class AccuracyMetrics:
         # Check for validity of arguments
         if not ((y_true == 0) | (y_true == 1)).all():
             raise ValueError("y_true must be a binary array!")
-
         if (y_true != 1).all():
             warnings.warn("There are no seizures events in y_true. Is this "
                           "expected?")
+        if y_true.ndim > 1:
+            raise ValueError("y_true contains more than one dimension. Flatten"
+                             "it to 1D before passing it to AccuracyMetrics.")
         self.y_true = y_true
 
         if not ((y_pred >= 0) & (y_pred <= 1)).all():
             raise ValueError("y_pred must contain values between 0 and 1.")
         if len(y_true) != len(y_pred):
             raise ValueError("y_true and y_pred should have the same length.")
+        if y_pred.ndim > 1:
+            raise ValueError("y_pred contains more than one dimension. Flatten"
+                             "it to 1D before passing it to AccuracyMetrics.")
         self.y_pred = y_pred
 
         if not sample_duration > 0:
