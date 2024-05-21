@@ -657,7 +657,7 @@ class AbstractModelStudy(abc.ABC):
         Generate run_trial.sh script in target_dir.
         """
         datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        n_total_jobs = cls.N_PARALLEL_CPU_JOBS + cls.N_PARALLEL_CPU_JOBS
+        n_total_jobs = cls.N_PARALLEL_CPU_JOBS + cls.N_PARALLEL_GPU_JOBS
         trial_path = target_dir / "current_trial.pickle"
 
         lines = ["#!/bin/bash",
