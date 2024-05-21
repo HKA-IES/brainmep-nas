@@ -260,10 +260,10 @@ class AccuracyMetrics:
 
         Parameters                                                                                                  
         ----------
-        y_true : int                                                                                                  
+        y_true : np.ndarray(int)
             1D array of true labels. Expected values are either 0 (no seizure)
             or 1 (seizure).
-        y_pred : float 
+        y_pred : np.ndarray(float)
             1D array of predicted labels. Expected values between 0 and 1.
         threshold : str or float
             The threshold to apply. Either a fixed (float) threshold or 
