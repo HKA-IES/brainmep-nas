@@ -5,8 +5,9 @@ import abc
 import pathlib
 import os
 import pickle
-from typing import Callable, Dict, Union, List, Any, Literal, Optional
+from typing import Callable, Dict, List, Any, Literal, Optional
 import datetime
+import time
 
 # import third-party modules
 import optuna
@@ -284,6 +285,7 @@ class AbstractModelStudy(abc.ABC):
         -------
         trial: optuna.Trial
         """
+        start_time = time.time()
         new_trial = study.ask()
 
         # sampled parameters are discarded because they are fixed in the trial
@@ -301,6 +303,9 @@ class AbstractModelStudy(abc.ABC):
         file_path = study_dir / "current_trial.pickle"
         with open(file_path, "wb") as file:
             pickle.dump(new_trial, file)
+
+        duration = time.time() - start_time
+        new_trial.set_user_attr("init_trial_duration", duration)
 
         return new_trial
 
@@ -336,12 +341,16 @@ class AbstractModelStudy(abc.ABC):
         accuracy_metrics: AccuracyMetrics
             AccuracyMetrics object.
         """
+        start_time = time.time()
         am = cls._get_accuracy_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         if inner_fold is None:
             inner_fold = "all"
         am_path = trial_dir / f"inner_fold_{inner_fold}_accuracy_metrics.pickle"
         pickle.dump(am, open(am_path, "wb"))
+
+        duration = time.time() - start_time
+        trial.set_user_attr(f"get_accuracy_metrics_{inner_fold}_duration", duration)
         return am
 
     @classmethod
@@ -376,12 +385,17 @@ class AbstractModelStudy(abc.ABC):
         hardware_metrics: HardwareMetrics
             HardwareMetrics object.
         """
+        start_time = time.time()
         hm = cls._get_hardware_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         if inner_fold is None:
             inner_fold = "all"
         hm_path = trial_dir / f"inner_fold_{inner_fold}_hardware_metrics.pickle"
         pickle.dump(hm, open(hm_path, "wb"))
+
+        duration = time.time() - start_time
+        trial.set_user_attr(f"get_hardware_metrics_{inner_fold}_duration",
+                            duration)
         return hm
 
     @classmethod
@@ -412,10 +426,15 @@ class AbstractModelStudy(abc.ABC):
         combined_metrics: CombinedMetrics
             CombinedMetrics object.
         """
+        start_time = time.time()
         cm = cls._get_combined_metrics(accuracy_metrics, hardware_metrics)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         cm_path = trial_dir / f"inner_fold_{inner_fold}_combined_metrics.pickle"
         pickle.dump(cm, open(cm_path, "wb"))
+
+        duration = time.time() - start_time
+        trial.set_user_attr(f"get_combined_metrics_{inner_fold}_duration",
+                            duration)
         return cm
 
     @classmethod
@@ -431,6 +450,8 @@ class AbstractModelStudy(abc.ABC):
         trial: optuna.Trial
             Trial object.
         """
+        start_time = time.time()
+
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         trial.set_user_attr("study_sampler", str(trial.study.sampler))
 
@@ -484,6 +505,9 @@ class AbstractModelStudy(abc.ABC):
 
         obj_2_value = df[cls.OBJ_2_METRIC].mean()
         obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
+
+        duration = time.time() - start_time
+        trial.set_user_attr(f"complete_trial_duration", duration)
 
         study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
         sampler_path = cls.get_sampler_path(study)
@@ -553,6 +577,8 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def __init_subclass__(cls):
+        # TODO: Replace this function by an explicit "test" function, which
+        #  would test all user attributes + class method implementations.
         # Adapted from https://stackoverflow.com/a/55544173
         required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
                                     "N_TRIALS", "THIS_FILE", "OBJ_1_METRIC",

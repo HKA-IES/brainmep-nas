@@ -211,7 +211,6 @@ class TestAbstractModelStudy:
                                   storage=study_storage)
 
         trial = DummyModelStudy1.init_trial(study)
-        trial_dir = DummyModelStudy1.get_trial_dir(trial)
 
         #DummyModelStudy1.get_hardware_metrics(trial)
         #DummyModelStudy1.get_accuracy_metrics(trial, 0)
@@ -228,10 +227,58 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(DummyModelStudy1)
 
     def test_get_outer_fold(self):
-        raise NotImplementedError
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        assert DummyModelStudy1.get_outer_fold(study) == 0
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
 
     def test_get_trial_dir(self):
-        raise NotImplementedError
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+        trial = DummyModelStudy1.init_trial(study)
+        expected_trial_dir = DummyModelStudy1.BASE_DIR / "outer_fold_0" / "trial_0"
+
+        assert DummyModelStudy1.get_trial_dir(trial) == expected_trial_dir.resolve()
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
+
+    def test_get_sampler_path(self):
+        DummyModelStudy1.setup()
+        study_storage_url = f"sqlite:///{DummyModelStudy1.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = DummyModelStudy1.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+        expected_sampler_path = DummyModelStudy1.BASE_DIR / "outer_fold_0" / "sampler.pickle"
+
+        assert DummyModelStudy1.get_sampler_path(study) == expected_sampler_path.resolve()
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(DummyModelStudy1)
 
     def test_cli(self):
         raise NotImplementedError
