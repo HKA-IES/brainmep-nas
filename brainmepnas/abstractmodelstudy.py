@@ -5,6 +5,7 @@ import abc
 import pathlib
 import os
 import pickle
+import tempfile
 from typing import Callable, Dict, List, Any, Literal, Optional
 import datetime
 import time
@@ -234,7 +235,10 @@ class AbstractModelStudy(abc.ABC):
 
         # Create dummy study and dummy trial
         study = optuna.create_study()
+        study.set_user_attr("outer_fold", 0)
         trial = study.ask()
+        tempdir = tempfile.TemporaryDirectory()
+        trial.set_user_attr("trial_dir", tempdir.name)
 
         # _sample_search_space
         try:
@@ -272,6 +276,8 @@ class AbstractModelStudy(abc.ABC):
         else:
             if not isinstance(cm, CombinedMetrics):
                 raise TypeError(f"_get_combined_metrics() returned unexpected type: {type(cm)}")
+
+        tempdir.cleanup()
 
     @classmethod
     def setup(cls):
