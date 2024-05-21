@@ -57,8 +57,10 @@ class TestTestbenchHardwareMetrics:
         Error is raised if the tflite model is not valid.
         """
         with pytest.raises(FileNotFoundError):
-            TestbenchHardwareMetrics(
-                host=remote_testbench_config["credentials"]["host"],
-                user=remote_testbench_config["credentials"]["user"],
-                password=remote_testbench_config["credentials"]["password"],
-                tflite_model_path="bad")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                TestbenchHardwareMetrics(
+                    host=remote_testbench_config["credentials"]["host"],
+                    user=remote_testbench_config["credentials"]["user"],
+                    password=remote_testbench_config["credentials"]["password"],
+                    tflite_model_path="bad",
+                    output_dir=pathlib.Path(temp_dir))
