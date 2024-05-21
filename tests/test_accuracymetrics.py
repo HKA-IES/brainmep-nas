@@ -477,3 +477,15 @@ class TestAccuracyMetrics:
                          }
 
         assert am.as_dict() == expected_dict
+
+    def test_non_flat_array(self):
+        """
+        No support for arrays with more than one dimensions., see issue #3.
+        """
+        y_true = np.array([[0], [0], [1], [1]])
+        with pytest.raises(ValueError):
+            am = AccuracyMetrics(y_true, y_true, sample_duration=4,
+                                 sample_offset=2)
+
+        y_true_flattened = y_true.flatten()
+        am = AccuracyMetrics(y_true_flattened, y_true_flattened, 4, 2)
