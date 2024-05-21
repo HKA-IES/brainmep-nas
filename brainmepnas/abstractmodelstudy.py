@@ -486,6 +486,8 @@ class AbstractModelStudy(abc.ABC):
         obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
 
         study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
+        sampler_path = cls.get_sampler_path(study)
+        pickle.dump(study.sampler, open(sampler_path, "wb"))
 
     @classmethod
     def get_outer_fold(cls, study: optuna.Study) -> int:
@@ -520,6 +522,23 @@ class AbstractModelStudy(abc.ABC):
             Trial directory.
         """
         return pathlib.Path(trial.user_attrs["trial_dir"])
+
+    @classmethod
+    def get_sampler_path(cls, study: optuna.Study) -> pathlib.Path:
+        """
+        Read the sampler path from a study.
+
+        Parameters
+        ----------
+        study: optuna.Study
+            Study object.
+
+        Returns
+        -------
+        sampler_path: pathlib.Path
+            Path to pickled sampler.
+        """
+        return pathlib.Path(study.user_attrs["sampler_path"])
 
     def __init__(self):
         """

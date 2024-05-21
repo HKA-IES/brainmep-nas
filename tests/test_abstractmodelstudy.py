@@ -11,7 +11,7 @@ import pytest
 import optuna
 
 # import your own module
-from brainmepnas import AbstractModelStudy, AccuracyMetrics, HardwareMetrics
+from brainmepnas import AbstractModelStudy
 from dummymodelstudy1 import DummyModelStudy1
 
 
@@ -231,15 +231,6 @@ class TestAbstractModelStudy:
         raise NotImplementedError
 
     def test_get_trial_dir(self):
-        raise NotImplementedError
-
-    def test_run_trial_sh(self):
-        raise NotImplementedError
-
-    def test_run_study_sh(self):
-        raise NotImplementedError
-
-    def test_run_model_study_sh(self):
         raise NotImplementedError
 
     def test_cli(self):
