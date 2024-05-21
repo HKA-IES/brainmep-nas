@@ -8,6 +8,7 @@ import pickle
 from typing import Callable, Dict, List, Any, Literal, Optional
 import datetime
 import time
+import warnings
 
 # import third-party modules
 import optuna
@@ -203,6 +204,74 @@ class AbstractModelStudy(abc.ABC):
     # ------------------
     # - Public methods -
     # ------------------
+
+    @classmethod
+    def self_test(cls):
+        """
+        Perform a self-test of the model study.
+
+        This tests specifically that the user implementation defines all
+        required attributes and that all methods run without errors.
+
+        No exception is raised if a step of the test fails. All information is
+        provided in warnings.
+        """
+        # Check that all attributes are defined.
+        # Adapted from https://stackoverflow.com/a/55544173
+        required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
+                                    "N_TRIALS", "THIS_FILE", "OBJ_1_METRIC",
+                                    "OBJ_1_SCALING", "OBJ_1_DIRECTION",
+                                    "OBJ_2_METRIC", "OBJ_2_SCALING",
+                                    "OBJ_2_DIRECTION", "N_PARALLEL_GPU_JOBS",
+                                    "N_PARALLEL_CPU_JOBS",
+                                    "GET_ACCURACY_METRICS_CALL",
+                                    "GET_ACCURACY_METRICS_USE_GPU",
+                                    "GET_HARDWARE_METRICS_CALL",
+                                    "GET_HARDWARE_METRICS_USE_GPU"]
+        for var in required_class_variables:
+            if not hasattr(cls, var):
+                raise NotImplementedError(f"Class attribute '{var}' is missing.")
+
+        # Create dummy study and dummy trial
+        study = optuna.create_study()
+        trial = study.ask()
+
+        # _sample_search_space
+        try:
+            params = cls._sample_search_space(trial)
+        except Exception as e:
+            print(f"Exception in _sample_search_space():")
+            raise e
+
+        # _get_accuracy_metrics
+        try:
+            am = cls._get_accuracy_metrics(trial, 0)
+        except Exception as e:
+            print(f"Exception in _get_accuracy_metrics():")
+            raise e
+        else:
+            if not isinstance(am, AccuracyMetrics):
+                raise TypeError(f"_get_accuracy_metrics() returned unexpected type: {type(am)}")
+
+        # _get_hardware_metrics
+        try:
+            hm = cls._get_hardware_metrics(trial, 0)
+        except Exception as e:
+            print(f"Exception in _get_hardware_metrics():")
+            raise e
+        else:
+            if not isinstance(hm, HardwareMetrics):
+                raise TypeError(f"_get_hardware_metrics() returned unexpected type: {type(hm)}")
+
+        # _get_combined_metrics
+        try:
+            cm = cls._get_combined_metrics(am, hm)
+        except Exception as e:
+            print(f"Exception in _get_combined_metrics():")
+            raise e
+        else:
+            if not isinstance(cm, CombinedMetrics):
+                raise TypeError(f"_get_combined_metrics() returned unexpected type: {type(cm)}")
 
     @classmethod
     def setup(cls):
@@ -576,26 +645,6 @@ class AbstractModelStudy(abc.ABC):
         raise RuntimeError
 
     @classmethod
-    def __init_subclass__(cls):
-        # TODO: Replace this function by an explicit "test" function, which
-        #  would test all user attributes + class method implementations.
-        # Adapted from https://stackoverflow.com/a/55544173
-        required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
-                                    "N_TRIALS", "THIS_FILE", "OBJ_1_METRIC",
-                                    "OBJ_1_SCALING", "OBJ_1_DIRECTION",
-                                    "OBJ_2_METRIC", "OBJ_2_SCALING",
-                                    "OBJ_2_DIRECTION", "N_PARALLEL_GPU_JOBS",
-                                    "N_PARALLEL_CPU_JOBS",
-                                    "GET_ACCURACY_METRICS_CALL",
-                                    "GET_ACCURACY_METRICS_USE_GPU",
-                                    "GET_HARDWARE_METRICS_CALL",
-                                    "GET_HARDWARE_METRICS_USE_GPU"]
-        for var in required_class_variables:
-            if not hasattr(cls, var):
-                raise NotImplementedError(f"Class {cls} lacks required '{var}'"
-                                          f" class attribute.")
-
-    @classmethod
     def _create_run_trial_sh(cls, target_dir: pathlib.Path,
                              study_storage: str, study_name: str,
                              sampler_path: pathlib.Path, outer_fold: int) -> pathlib.Path:
@@ -764,6 +813,18 @@ class AbstractModelStudy(abc.ABC):
         ```
         where FILE is the file where MyModelStudy is defined.
         """
+        # self_test()
+        self_test_params = []
+        self_test_cmd = click.Command("self-test",
+                                      callback=cls._cli_self_test,
+                                      params=self_test_params)
+
+        # setup()
+        setup_params = []
+        setup_cmd = click.Command("setup",
+                                  callback=cls._cli_setup,
+                                  params=setup_params)
+
         # init_trial()
         init_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
                                            type=str, required=True),
@@ -796,12 +857,6 @@ class AbstractModelStudy(abc.ABC):
                                             callback=cls._cli_get_accuracy_metrics,
                                             params=get_accuracy_metrics_params)
 
-        # setup()
-        setup_params = []
-        setup_cmd = click.Command("setup",
-                                  callback=cls._cli_setup,
-                                  params=setup_params)
-
         # complete_trial()
         complete_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
                                            type=str, required=True),
@@ -816,12 +871,20 @@ class AbstractModelStudy(abc.ABC):
                                        params=complete_trial_params)
 
         # Group all commands
-        group = click.Group(commands=[init_trial_cmd,
+        group = click.Group(commands=[self_test_cmd,
+                                      setup_cmd,
+                                      init_trial_cmd,
                                       get_hardware_metrics_cmd,
                                       get_accuracy_metrics_cmd,
-                                      setup_cmd,
                                       complete_trial_cmd])
         group()
+
+    @classmethod
+    def _cli_self_test(cls):
+        """
+        Command-line entry point for the function self_test().
+        """
+        cls.self_test()
 
     @classmethod
     def _cli_setup(cls):

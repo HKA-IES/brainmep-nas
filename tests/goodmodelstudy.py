@@ -13,7 +13,7 @@ from brainmepnas import (AbstractModelStudy, HardwareMetrics, AccuracyMetrics,
                          CombinedMetrics)
 
 
-class DummyModelStudy1(AbstractModelStudy):
+class GoodModelStudy(AbstractModelStudy):
     """
     Dummy implementation of AbstractModelStudy to facilitate testing.
     """
@@ -44,8 +44,8 @@ class DummyModelStudy1(AbstractModelStudy):
 
     @classmethod
     def _sample_search_space(cls, trial: optuna.Trial) -> Dict[str, Any]:
-        d = {"param0", trial.suggest_int("param0", 0, 10),
-             "param1", trial.suggest_float("param1", 2, 3)}
+        d = {"param0": trial.suggest_int("param0", 0, 10),
+             "param1": trial.suggest_float("param1", 2, 3)}
         return d
 
     @classmethod
@@ -87,4 +87,4 @@ class DummyModelStudy1(AbstractModelStudy):
 
 
 if __name__ == "__main__":
-    DummyModelStudy1.cli_entry_point()
+    GoodModelStudy.cli_entry_point()
