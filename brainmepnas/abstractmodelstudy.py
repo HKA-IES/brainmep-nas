@@ -589,10 +589,12 @@ class AbstractModelStudy(abc.ABC):
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
             return None
         else:
+            trial.set_user_attr(cls.OBJ_1_METRIC, obj_1_value)
+            trial.set_user_attr(cls.OBJ_2_METRIC, obj_2_value)
             duration = time.time() - start_time
             trial.set_user_attr(f"complete_trial_duration", duration)
             study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
-        
+
         sampler_path = cls.get_sampler_path(study)
         pickle.dump(study.sampler, open(sampler_path, "wb"))
 
