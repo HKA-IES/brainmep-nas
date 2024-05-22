@@ -568,22 +568,31 @@ class AbstractModelStudy(abc.ABC):
                 metrics_dicts.append(d)
         except FileNotFoundError:
             # Fail trial if one of the expected metrics file is absent.
+            duration = time.time() - start_time
+            trial.set_user_attr(f"complete_trial_duration", duration)
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
             return None
 
         df = pd.DataFrame.from_records(metrics_dicts)
         df.to_csv(trial_dir / "metrics.csv")
 
-        obj_1_value = df[cls.OBJ_1_METRIC].mean()
-        obj_1_value_scaled = cls.OBJ_1_SCALING(obj_1_value)
+        try:
+            obj_1_value = df[cls.OBJ_1_METRIC].mean()
+            obj_1_value_scaled = cls.OBJ_1_SCALING(obj_1_value)
 
-        obj_2_value = df[cls.OBJ_2_METRIC].mean()
-        obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
-
-        duration = time.time() - start_time
-        trial.set_user_attr(f"complete_trial_duration", duration)
-
-        study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
+            obj_2_value = df[cls.OBJ_2_METRIC].mean()
+            obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
+        except KeyError:
+            # Fail trial if objective is not found in the metrics.
+            duration = time.time() - start_time
+            trial.set_user_attr(f"complete_trial_duration", duration)
+            study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            return None
+        else:
+            duration = time.time() - start_time
+            trial.set_user_attr(f"complete_trial_duration", duration)
+            study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
+        
         sampler_path = cls.get_sampler_path(study)
         pickle.dump(study.sampler, open(sampler_path, "wb"))
 
