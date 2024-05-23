@@ -513,20 +513,19 @@ class AbstractModelStudy(abc.ABC):
         return cm
 
     @classmethod
-    def complete_trial(cls, study: optuna.Study, trial: optuna.Trial):
+    def complete_trial(cls, trial: optuna.Trial):
         """
         Complete the given trial by compiling the produced metrics, extracting
         the desired objectives, and reporting the objectives to the study.
 
         Parameters
         ----------
-        study: optuna.Study
-            Study object.
         trial: optuna.Trial
             Trial object.
         """
         start_time = time.time()
 
+        study = trial.study
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
 
         n_inner_folds = cls.N_FOLDS - 1
@@ -571,6 +570,8 @@ class AbstractModelStudy(abc.ABC):
             duration = time.time() - start_time
             trial.set_user_attr(f"complete_trial_duration", duration)
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            sampler_path = cls.get_sampler_path(study)
+            pickle.dump(study.sampler, open(sampler_path, "wb"))
             return None
 
         df = pd.DataFrame.from_records(metrics_dicts)
@@ -587,16 +588,16 @@ class AbstractModelStudy(abc.ABC):
             duration = time.time() - start_time
             trial.set_user_attr(f"complete_trial_duration", duration)
             study.tell(trial, state=optuna.trial.TrialState.FAIL)
-            return None
+            sampler_path = cls.get_sampler_path(study)
+            pickle.dump(study.sampler, open(sampler_path, "wb"))
         else:
             trial.set_user_attr(cls.OBJ_1_METRIC, obj_1_value)
             trial.set_user_attr(cls.OBJ_2_METRIC, obj_2_value)
             duration = time.time() - start_time
             trial.set_user_attr(f"complete_trial_duration", duration)
             study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
-
-        sampler_path = cls.get_sampler_path(study)
-        pickle.dump(study.sampler, open(sampler_path, "wb"))
+            sampler_path = cls.get_sampler_path(study)
+            pickle.dump(study.sampler, open(sampler_path, "wb"))
 
     @classmethod
     def get_outer_fold(cls, study: optuna.Study) -> int:
@@ -728,7 +729,7 @@ class AbstractModelStudy(abc.ABC):
 
         lines += ["",
                   "# Complete trial",
-                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()} -t {trial_path.resolve()}",
+                  f"python {cls.THIS_FILE} complete_trial -t {trial_path.resolve()}",
                   "",
                   "echo 'Trial complete.'"]
 
@@ -874,14 +875,7 @@ class AbstractModelStudy(abc.ABC):
                                             params=get_accuracy_metrics_params)
 
         # complete_trial()
-        complete_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
-                                           type=str, required=True),
-                           click.Option(["-n", "--study-name", "study_name"],
-                                           type=str, required=True),
-                                 click.Option(
-                                     ["-s", "--sampler_path", "sampler_path"],
-                                     type=str, required=True),
-                                 click.Option(
+        complete_trial_params = [click.Option(
                                      ["-t", "--trial-path", "trial_path"],
                                      type=str, required=True)
                            ]
@@ -958,14 +952,9 @@ class AbstractModelStudy(abc.ABC):
         _ = cls.get_accuracy_metrics(trial, inner_fold)
 
     @classmethod
-    def _cli_complete_trial(cls, study_storage_url: str, study_name: str,
-                            sampler_path: str, trial_path: str):
+    def _cli_complete_trial(cls, trial_path: str):
         """
         Command-line entry point for the function complete_trial().
         """
-        sampler = pickle.load(open(sampler_path, "rb"))
-        study = optuna.load_study(storage=study_storage_url,
-                                  study_name=study_name,
-                                  sampler=sampler)
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
-        cls.complete_trial(study, trial)
+        cls.complete_trial(trial)

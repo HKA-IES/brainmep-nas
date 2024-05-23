@@ -194,14 +194,13 @@ class TestAbstractModelStudy:
                                   storage=study_storage)
 
         trial = GoodModelStudy.init_trial(study)
-        trial_dir = GoodModelStudy.get_trial_dir(trial)
 
         GoodModelStudy.get_hardware_metrics(trial)
         GoodModelStudy.get_accuracy_metrics(trial, 0)
         GoodModelStudy.get_accuracy_metrics(trial, 1)
 
         assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
-        GoodModelStudy.complete_trial(study, trial)
+        GoodModelStudy.complete_trial(trial)
         assert study.trials[-1].state == optuna.trial.TrialState.COMPLETE
 
         # Properly close connection to the storage
@@ -226,7 +225,7 @@ class TestAbstractModelStudy:
         #DummyModelStudy1.get_accuracy_metrics(trial, 1)
 
         assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
-        GoodModelStudy.complete_trial(study, trial)
+        GoodModelStudy.complete_trial(trial)
         assert study.trials[-1].state == optuna.trial.TrialState.FAIL
 
         # Properly close connection to the storage
