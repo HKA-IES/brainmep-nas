@@ -89,7 +89,7 @@ class TestAbstractModelStudy:
                                   storage=study_storage)
 
         mocked_method = mocker.patch(
-            "dummymodelstudy1.DummyModelStudy1._sample_search_space")
+            "goodmodelstudy.GoodModelStudy._sample_search_space")
         mocked_method.return_value = None
 
         trial = GoodModelStudy.init_trial(study)
@@ -118,7 +118,7 @@ class TestAbstractModelStudy:
         trial = GoodModelStudy.init_trial(study)
         trial_dir = GoodModelStudy.get_trial_dir(trial)
 
-        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_accuracy_metrics")
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_accuracy_metrics")
         mocked_method.return_value = None
 
         am = GoodModelStudy.get_accuracy_metrics(trial, 1)
@@ -144,7 +144,7 @@ class TestAbstractModelStudy:
         trial = GoodModelStudy.init_trial(study)
         trial_dir = GoodModelStudy.get_trial_dir(trial)
 
-        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_hardware_metrics")
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_hardware_metrics")
         mocked_method.return_value = None
 
         hm = GoodModelStudy.get_hardware_metrics(trial, 1)
@@ -170,7 +170,7 @@ class TestAbstractModelStudy:
         trial = GoodModelStudy.init_trial(study)
         trial_dir = GoodModelStudy.get_trial_dir(trial)
 
-        mocked_method = mocker.patch("dummymodelstudy1.DummyModelStudy1._get_combined_metrics")
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_combined_metrics")
         mocked_method.return_value = None
 
         cm = GoodModelStudy.get_combined_metrics(trial, 1, None, None)

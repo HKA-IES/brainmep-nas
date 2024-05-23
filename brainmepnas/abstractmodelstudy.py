@@ -728,7 +728,7 @@ class AbstractModelStudy(abc.ABC):
 
         lines += ["",
                   "# Complete trial",
-                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -t {trial_path.resolve()}",
+                  f"python {cls.THIS_FILE} complete_trial -u {study_storage} -n {study_name} -s {sampler_path.resolve()} -t {trial_path.resolve()}",
                   "",
                   "echo 'Trial complete.'"]
 
@@ -879,6 +879,9 @@ class AbstractModelStudy(abc.ABC):
                            click.Option(["-n", "--study-name", "study_name"],
                                            type=str, required=True),
                                  click.Option(
+                                     ["-s", "--sampler_path", "sampler_path"],
+                                     type=str, required=True),
+                                 click.Option(
                                      ["-t", "--trial-path", "trial_path"],
                                      type=str, required=True)
                            ]
@@ -956,11 +959,13 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _cli_complete_trial(cls, study_storage_url: str, study_name: str,
-                            trial_path: str):
+                            sampler_path: str, trial_path: str):
         """
         Command-line entry point for the function complete_trial().
         """
+        sampler = pickle.load(open(sampler_path, "rb"))
         study = optuna.load_study(storage=study_storage_url,
-                                  study_name=study_name)
+                                  study_name=study_name,
+                                  sampler=sampler)
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
         cls.complete_trial(study, trial)
