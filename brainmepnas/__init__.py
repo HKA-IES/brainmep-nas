@@ -2,8 +2,6 @@ from .dataset import Dataset
 from .accuracymetrics import AccuracyMetrics
 from .hardwaremetrics import HardwareMetrics
 from .combinedmetrics import CombinedMetrics
-from .modelstudy.modelstudy import initialize_model_study, init_trial, train_test_fold
-from .abstractmodel import AbstractModel
 from .abstractmodelstudy import AbstractModelStudy
 
 # Note: mltkhardwaremetrics.MltkHardwareMetrics and
