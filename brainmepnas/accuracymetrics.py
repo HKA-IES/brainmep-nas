@@ -49,7 +49,7 @@ class AccuracyMetrics:
     sample_duration: float
         Duration of a single sample, in seconds.
     sample_offset: float
-        Time offset between the end of a sample and the beginning of the
+        Time offset between the beginning of a sample and the beginning of the
         following sample, in seconds.
     threshold_method: str
         Method used to set the threshold. Can be one of the following:
