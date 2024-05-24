@@ -17,6 +17,7 @@ classifiers = [
 dependencies = [
     "numpy",
     "scikit-learn",
+    "click",
 ]
 license = {file = "LICENSE"}
 
