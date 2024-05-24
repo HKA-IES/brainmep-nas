@@ -17,8 +17,9 @@ classifiers = [
 dependencies = [
     "numpy",
     "scikit-learn",
+    "click",
     "optuna",
-    "codecarbon"
+    "codecarbon",
 ]
 license = {file = "LICENSE"}
 

@@ -1,3 +1,4 @@
+from .dataset import Dataset
 from .accuracymetrics import AccuracyMetrics
 from .hardwaremetrics import HardwareMetrics
 from .combinedmetrics import CombinedMetrics
