@@ -231,7 +231,7 @@ def _get_processed_arrays(edf,
     logging.info(f"\t{nb_epochs_ictal}/{len(epochs)} epochs "
                  f"are ictal")
 
-    return x, y
+    return x_scaled, y
 
 if __name__ == '__main__':
     process_time_series()
