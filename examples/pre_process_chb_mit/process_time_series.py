@@ -16,10 +16,9 @@ import click
 from brainmepnas.dataset import create_new_dataset, add_record_to_dataset
 
 # Fixed parameters
-TRAIN_WINDOW_LENGTH = 4     # seconds
-TRAIN_WINDOW_OVERLAP = 0    # seconds
-TEST_WINDOW_LENGTH = TRAIN_WINDOW_LENGTH    # seconds
-TEST_WINDOW_OVERLAP = 2     # seconds
+WINDOW_DURATION = 4     # seconds
+TRAIN_WINDOW_OFFSET = 4    # seconds
+TEST_WINDOW_OFFSET = 2     # seconds
 CHANNELS = ["F7-T7", "T7-P7", "F8-T8", "T8-P8-0"]
 
 @click.command()
@@ -56,16 +55,10 @@ def process_time_series(raw_data_dir: pathlib.Path, output_dir: pathlib.Path):
     logging.info(f"Found {nb_patients} patients.")
 
     # Create the dataset with basic infos
-    sample_record_path = list(records_with_seizures.values())[0][0]
-    sample_edf = mne.io.read_raw_edf(raw_data_dir / sample_record_path)
-    sampling_frequency = sample_edf.info["sfreq"]
-    train_window_overlap = TRAIN_WINDOW_OVERLAP * sampling_frequency
-    test_window_overlap = TEST_WINDOW_OVERLAP * sampling_frequency
-
     create_new_dataset(directory=output_dir,
-                       sampling_frequency=sampling_frequency,
-                       train_window_overlap=train_window_overlap,
-                       test_window_overlap=test_window_overlap,
+                       window_duration=WINDOW_DURATION,
+                       train_window_offset=TRAIN_WINDOW_OFFSET,
+                       test_window_offset=TEST_WINDOW_OFFSET,
                        overwrite=True)
 
     # Process each record and add them to the dataset
@@ -101,17 +94,19 @@ def process_time_series(raw_data_dir: pathlib.Path, output_dir: pathlib.Path):
 
             # Training set
             logging.info("\tPreparing training set.")
+            train_window_overlap = WINDOW_DURATION - TRAIN_WINDOW_OFFSET
             train_input, train_labels = _get_processed_arrays(edf,
-                                      TRAIN_WINDOW_LENGTH,
-                                      TRAIN_WINDOW_OVERLAP)
+                                      WINDOW_DURATION,
+                                      train_window_overlap)
             add_record_to_dataset(output_dir, str(p), "train",
                                   train_input, train_labels)
 
             # Prepare test set
             logging.info("\tPreparing test set.")
+            test_window_overlap = WINDOW_DURATION - TEST_WINDOW_OFFSET
             test_input, test_labels = _get_processed_arrays(edf,
-                                                              TEST_WINDOW_LENGTH,
-                                                              TEST_WINDOW_OVERLAP)
+                                                            WINDOW_DURATION,
+                                                            test_window_overlap)
             add_record_to_dataset(output_dir, str(p), "test",
                                   test_input, test_labels)
 
