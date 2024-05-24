@@ -193,3 +193,19 @@ class TestDataset:
 
         with pytest.raises(StopIteration):
             next(split)
+
+    def test_patients_not_modifiable(self, dataset):
+        modified_patients = dataset.patients
+        assert modified_patients == dataset.patients
+
+        modified_patients.append("new")
+
+        assert modified_patients != dataset.patients
+
+    def test_nb_records_per_patient_not_modifiable(self, dataset):
+        modified_nb_records_per_patient = dataset.nb_records_per_patient
+        assert modified_nb_records_per_patient == dataset.nb_records_per_patient
+
+        modified_nb_records_per_patient["new"] = 3
+
+        assert modified_nb_records_per_patient != dataset.nb_records_per_patient

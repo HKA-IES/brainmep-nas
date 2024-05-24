@@ -31,8 +31,6 @@ class Dataset:
     loading a dataset.
     """
 
-    # TODO: Bug, "patients" can be modified
-
     def __init__(self, directory: Union[str, pathlib.Path]):
         """
         Load an existing dataset.
@@ -221,14 +219,14 @@ class Dataset:
         """
         List of patients in dataset.
         """
-        return self._patients
+        return self._patients[:]
 
     @property
     def nb_records_per_patient(self) -> dict[str: int]:
         """
         Number of records per patient
         """
-        return self._nb_records_per_patient
+        return self._nb_records_per_patient.copy()
 
     @property
     def total_nb_records(self) -> int:
