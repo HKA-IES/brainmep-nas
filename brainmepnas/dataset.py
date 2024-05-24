@@ -300,7 +300,8 @@ def create_new_dataset(directory: Union[str, pathlib.Path],
         Duration of a window, in seconds.
     train_window_offset: float
         Time offset between the beginning of a window and the beginning of the
-        following window for the train set, in seconds.
+        following window for the train set, in seconds. If there is no overlap
+        between windows, train_window_offset = window duration.
     test_window_offset: float
         Time offset between the beginning of a window and the beginning of the
         following window for the test set, in seconds.
@@ -312,6 +313,20 @@ def create_new_dataset(directory: Union[str, pathlib.Path],
     FileExistsError
         If the dataset already exists.
     """
+    # Check for validity of arguments
+    if not window_duration > 0:
+        raise ValueError("window_duration must be > 0 seconds.")
+
+    if not train_window_offset > 0:
+        raise ValueError("train_window_offset must be > 0 seconds. For "
+                         "non-overlapping samples: "
+                         "train_window_offset >= window")
+
+    if not train_window_offset > 0:
+        raise ValueError("test_window_offset must be > 0 seconds. For "
+                         "non-overlapping samples: "
+                         "test_window_offset >= window")
+
     # Create dataset folder
     if isinstance(directory, str):
         directory = pathlib.Path(directory)
