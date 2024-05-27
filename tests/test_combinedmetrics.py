@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
+import tempfile
+import pickle
 
 # import third-party modules
 import pytest
@@ -166,3 +168,38 @@ class TestCombinedMetrics:
                          "undesired_energy_per_hour": cm.undesired_energy_per_hour}
 
         assert cm.as_dict() == expected_dict
+
+    def test_pickle(self):
+        """
+        CombinedMetrics should be pickleable.
+        """
+        # Initialize AccuracyMetrics and HardwareMetrics
+        y_true = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        y_pred = np.array([0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 1, 1, 1, 0, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 0, 1, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 1, 0, 1, 0, 0])
+
+        sample_duration = 4
+        sample_offset = 4
+
+        am = AccuracyMetrics(y_true, y_pred, sample_duration,
+                             sample_offset, threshold=0.5)
+
+        inference_energy = 1
+        inference_time = 2
+
+        hm = HardwareMetrics(inference_time, inference_energy)
+
+        stimulation_energy = 10.0
+        cm = CombinedMetrics(am, hm, stimulation_energy)
+
+        with tempfile.TemporaryFile() as tmpfile:
+            pickle.dump(cm, tmpfile)
