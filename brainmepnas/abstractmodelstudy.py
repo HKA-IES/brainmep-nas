@@ -694,12 +694,12 @@ class AbstractModelStudy(abc.ABC):
                  "# Queue jobs"]
 
         if cls.GET_ACCURACY_METRICS_USE_GPU:
-            get_accuracy_metrics_gpu_option = "-G"
+            get_accuracy_metrics_gpu_option = "-G 1 "
         else:
             get_accuracy_metrics_gpu_option = ""
 
         if cls.GET_HARDWARE_METRICS_USE_GPU:
-            get_hardware_metrics_gpu_option = "-G"
+            get_hardware_metrics_gpu_option = "-G 1 "
         else:
             get_hardware_metrics_gpu_option = ""
         job_names = []

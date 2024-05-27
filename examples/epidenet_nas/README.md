@@ -8,12 +8,21 @@ EpiDeNet architecture for epileptic seizure detection.
 
 ## Requirements
 - Pre-processed CHB-MIT dataset, see examples/pre_process_chb_mit/
+- [SQLite](https://www.sqlite.org/download.html)
 
 ## Usage
 
+First, set DATASET_DIR in basemodelstudy.py to the directory containing the
+pre-processed CHB-MIT data (see examples/pre_process_chb_mit/)
+
 ### GPU
 
-Not yet implemented.
+```
+python gpu_modelstudy.py self-test
+python gpu_modelstudy.py setup
+./gpu_modelstudy/run_model_study.sh
+optuna-dashboard sqlite:///gpu_modelstudy/study_storage.db
+```
 
 ### CPU
 
