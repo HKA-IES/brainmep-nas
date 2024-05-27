@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn",
     "click",
     "optuna",
+    "optuna-dashboard",
     "codecarbon",
 ]
 license = {file = "LICENSE"}
