@@ -15,6 +15,7 @@ import warnings
 import optuna
 import pandas as pd
 import click
+import codecarbon
 
 # import your own module
 from brainmepnas import AccuracyMetrics, CombinedMetrics, HardwareMetrics
@@ -417,11 +418,23 @@ class AbstractModelStudy(abc.ABC):
             AccuracyMetrics object.
         """
         start_time = time.time()
-        am = cls._get_accuracy_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         if inner_fold is None:
             inner_fold = "all"
-        am_path = trial_dir / f"inner_fold_{inner_fold}_accuracy_metrics.pickle"
+        description = f"inner_fold_{inner_fold}_accuracy_metrics"
+
+        tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
+                                                     project_name=description,
+                                                     tracking_mode="process",
+                                                     output_dir=trial_dir,
+                                                     log_level="WARNING")
+        tracker.start()
+
+        am = cls._get_accuracy_metrics(trial, inner_fold)
+
+        tracker.stop()
+
+        am_path = trial_dir / (description + ".pickle")
         pickle.dump(am, open(am_path, "wb"))
 
         duration = time.time() - start_time
@@ -461,11 +474,23 @@ class AbstractModelStudy(abc.ABC):
             HardwareMetrics object.
         """
         start_time = time.time()
-        hm = cls._get_hardware_metrics(trial, inner_fold)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
         if inner_fold is None:
             inner_fold = "all"
-        hm_path = trial_dir / f"inner_fold_{inner_fold}_hardware_metrics.pickle"
+        description = f"inner_fold_{inner_fold}_hardware_metrics"
+
+        tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
+                                                     project_name=description,
+                                                     tracking_mode="process",
+                                                     output_dir=trial_dir,
+                                                     log_level="WARNING")
+        tracker.start()
+
+        hm = cls._get_hardware_metrics(trial, inner_fold)
+
+        tracker.stop()
+
+        hm_path = trial_dir / (description + ".pickle")
         pickle.dump(hm, open(hm_path, "wb"))
 
         duration = time.time() - start_time
@@ -502,9 +527,21 @@ class AbstractModelStudy(abc.ABC):
             CombinedMetrics object.
         """
         start_time = time.time()
-        cm = cls._get_combined_metrics(accuracy_metrics, hardware_metrics)
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        cm_path = trial_dir / f"inner_fold_{inner_fold}_combined_metrics.pickle"
+        description = f"inner_fold_{inner_fold}_combined_metrics"
+
+        tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
+                                                     project_name=description,
+                                                     tracking_mode="process",
+                                                     output_dir=trial_dir,
+                                                     log_level="WARNING")
+        tracker.start()
+
+        cm = cls._get_combined_metrics(accuracy_metrics, hardware_metrics)
+
+        tracker.stop()
+
+        cm_path = trial_dir / (description + ".pickle")
         pickle.dump(cm, open(cm_path, "wb"))
 
         duration = time.time() - start_time
