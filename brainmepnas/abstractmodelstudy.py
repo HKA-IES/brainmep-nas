@@ -333,7 +333,7 @@ class AbstractModelStudy(abc.ABC):
             study.set_user_attr("sampler_path", str(sampler_path.resolve()))
 
             run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
-                                     sampler_path, outer_fold)
+                                     sampler_path)
             run_study_sh_path = cls._create_run_study_sh(outer_fold_dir, run_trial_sh_path)
             run_study_files.append(run_study_sh_path)
         cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
@@ -664,7 +664,7 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def _create_run_trial_sh(cls, target_dir: pathlib.Path,
                              study_storage: str, study_name: str,
-                             sampler_path: pathlib.Path, outer_fold: int) -> pathlib.Path:
+                             sampler_path: pathlib.Path) -> pathlib.Path:
         """
         Generate run_trial.sh script in target_dir.
         """
@@ -685,42 +685,52 @@ class AbstractModelStudy(abc.ABC):
                  "# Configure task spooler",
                  f"# {cls.N_PARALLEL_CPU_JOBS} CPU jobs + {cls.N_PARALLEL_GPU_JOBS} GPU jobs = {n_total_jobs} total jobs",
                  f"ts -S {n_total_jobs}",
-                 "ts --set_gpu_free_perc 80",
-                 "ts -C",
-                 "",
+                 "ts -C"]
+
+        if cls.GET_ACCURACY_METRICS_USE_GPU or cls.GET_HARDWARE_METRICS_USE_GPU:
+            lines += ["ts --set_gpu_free_perc 80"]
+
+        lines += ["",
                  "# Queue jobs"]
 
-        get_accuracy_metrics_gpu_int = 1 if cls.GET_ACCURACY_METRICS_USE_GPU else 0
-        get_hardware_metrics_gpu_int = 1 if cls.GET_HARDWARE_METRICS_USE_GPU else 0
+        if cls.GET_ACCURACY_METRICS_USE_GPU:
+            get_accuracy_metrics_gpu_option = "-G"
+        else:
+            get_accuracy_metrics_gpu_option = ""
+
+        if cls.GET_HARDWARE_METRICS_USE_GPU:
+            get_hardware_metrics_gpu_option = "-G"
+        else:
+            get_hardware_metrics_gpu_option = ""
         job_names = []
 
         # Call once
         if cls.GET_ACCURACY_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()})"]
+            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()})"]
 
         if cls.GET_HARDWARE_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
             if cls.GET_ACCURACY_METRICS_CALL == "once":
                 # Wait for last get_accuracy_metrics job to complete.
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
             else:
-                lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
+                lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
 
         # Call per_inner_fold
         n_inner_folds = cls.N_FOLDS-1
         for inner_fold in range(n_inner_folds):
             if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts -G {get_accuracy_metrics_gpu_int} python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} -i {inner_fold})"]
 
             if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
                 if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                     # Wait for last get_accuracy_metrics job to complete.
-                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
                 else:
-                    lines += [f"{job_names[-1]}=$(ts -G {get_hardware_metrics_gpu_int} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
 
         # Wait for all jobs to complete
         lines += [""]
