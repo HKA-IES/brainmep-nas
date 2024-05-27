@@ -79,8 +79,6 @@ class MltkHardwareMetrics(HardwareMetrics):
     mac_per_s: float
     inference_per_sec: float
 
-    profiling_results: "ProfilingModelResults"
-
     def __init__(self, tflite_model_path: str):
         """
         Estimate the hardware performance of a TFLite model from the
@@ -97,10 +95,10 @@ class MltkHardwareMetrics(HardwareMetrics):
         tflite_model_path: str
             Path to .tflite file.
         """
-        self.profiling_results = profile_model(tflite_model_path,
+        profiling_results = profile_model(tflite_model_path,
                                                accelerator="MVP",
                                                return_estimates=True)
-        summary = self.profiling_results.get_summary(exclude_null=False,
+        summary = profiling_results.get_summary(exclude_null=False,
                                                      full_summary=True)
 
         self.inference_time = summary["time"]

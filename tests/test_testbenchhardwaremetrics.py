@@ -4,6 +4,7 @@
 import configparser
 import pathlib
 import tempfile
+import pickle
 
 # import third-party modules
 import pytest
@@ -57,8 +58,23 @@ class TestTestbenchHardwareMetrics:
         Error is raised if the tflite model is not valid.
         """
         with pytest.raises(FileNotFoundError):
-            TestbenchHardwareMetrics(
-                host=remote_testbench_config["credentials"]["host"],
-                user=remote_testbench_config["credentials"]["user"],
-                password=remote_testbench_config["credentials"]["password"],
-                tflite_model_path="bad")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                TestbenchHardwareMetrics(
+                    host=remote_testbench_config["credentials"]["host"],
+                    user=remote_testbench_config["credentials"]["user"],
+                    password=remote_testbench_config["credentials"]["password"],
+                    tflite_model_path="bad",
+                    output_dir=pathlib.Path(temp_dir))
+
+    def test_pickle(self, remote_testbench_config):
+        """
+        TestbenchHardwareMetrics should be pickleable.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hm = TestbenchHardwareMetrics(host=remote_testbench_config["credentials"]["host"],
+                                          user=remote_testbench_config["credentials"]["user"],
+                                          password=remote_testbench_config["credentials"]["password"],
+                                          tflite_model_path=self.GOOD_TFLITE_MODEL,
+                                          output_dir=pathlib.Path(temp_dir))
+            with tempfile.TemporaryFile() as tmpfile:
+                pickle.dump(hm, tmpfile)

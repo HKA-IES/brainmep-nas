@@ -50,7 +50,7 @@ class TestbenchHardwareMetrics(HardwareMetrics):
 
     def __init__(self, host: str, user: str, password: str,
                  tflite_model_path: Union[str, pathlib.Path],
-                 output_dir: Optional[Union[str, pathlib.Path]] = None):
+                 output_dir: Union[str, pathlib.Path]):
         """
         Estimate the hardware performance of a TFLite model from the
         Seizure Detection Testbench.
@@ -72,7 +72,7 @@ class TestbenchHardwareMetrics(HardwareMetrics):
             through external or public versioning tools.
         tflite_model_path: Union[str, pathlib.Path]
             Path to .tflite file.
-        output_dir: Union[str, pathlib.Path], optional
+        output_dir: Union[str, pathlib.Path]
             Directory to store output traces from the remote testbench.
 
         Raises
@@ -83,13 +83,12 @@ class TestbenchHardwareMetrics(HardwareMetrics):
         """
         if isinstance(tflite_model_path, str):
             tflite_model_path = pathlib.Path(tflite_model_path)
-        if output_dir is not None:
-            if isinstance(output_dir, str):
-                output_dir = pathlib.Path(output_dir)
 
         rt = RemoteTestbench(host, user, password)
         rt.begin_test_tflite_model(tflite_model_path)
 
+        if isinstance(output_dir, str):
+            output_dir = pathlib.Path(output_dir)
         nnresults = rt.get_results_test_tflite_model(str(output_dir.resolve()))
 
         # The testbench returns values for a certain number of inferences.

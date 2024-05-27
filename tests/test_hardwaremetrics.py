@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
+import tempfile
+import pickle
 
 # import third-party modules
 import pytest
@@ -39,3 +41,12 @@ class TestHardwareMetrics:
                          "inference_energy": 2}
 
         assert hm.as_dict() == expected_dict
+
+    def test_pickle(self):
+        """
+        HardwareMetrics should be pickleable.
+        """
+        hm = HardwareMetrics(inference_time=1,
+                             inference_energy=2)
+        with tempfile.TemporaryFile() as tmpfile:
+            pickle.dump(hm, tmpfile)
