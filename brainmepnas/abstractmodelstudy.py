@@ -9,7 +9,6 @@ import tempfile
 from typing import Callable, Dict, List, Any, Literal, Optional
 import datetime
 import time
-import warnings
 
 # import third-party modules
 import optuna
