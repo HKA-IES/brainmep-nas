@@ -45,8 +45,7 @@ class Dataset:
             self._directory = pathlib.Path(self._directory)
 
         if not os.path.isdir(self._directory):
-            raise ValueError(
-                f"No dataset found at location {self._directory}.")
+            raise ValueError(f"No dataset found at {self._directory}.")
 
         # Read properties
         properties_file_path = self._directory / "properties.json"
@@ -61,11 +60,11 @@ class Dataset:
         self._test_records = {}
         self._patients = []
         self._nb_records_per_patient = {}
-        for id, val in properties["patients"].items():
-            self._train_records[id] = val["train_records"]
-            self._test_records[id] = val["test_records"]
-            self._patients.append(id)
-            self._nb_records_per_patient[id] = len(self._train_records[id])
+        for patient, val in properties["patients"].items():
+            self._train_records[patient] = val["train_records"]
+            self._test_records[patient] = val["test_records"]
+            self._patients.append(patient)
+            self._nb_records_per_patient[patient] = len(self._train_records[id])
 
         sample_data_file_path = (self._directory /
                                  self._train_records[self.patients[0]][0])
@@ -156,9 +155,9 @@ class Dataset:
         cross-validation for a single patient.
 
         Example use:
-        for train, test in dataset.split_leave_one_record_out("1"):
-            train_x, train_y = dataset.get_data(train)
-            test_x, test_y = dataset.get_data(test)
+        for train_recs, test_recs in dataset.split_leave_one_record_out("1"):
+            train_x, train_y = dataset.get_data(train_recs, "train")
+            test_x, test_y = dataset.get_data(test_recs, "test")
 
         Parameters
         ----------
@@ -190,9 +189,9 @@ class Dataset:
         cross-validation for.
 
         Example use:
-        for train, test in dataset.split_leave_one_patient_out():
-            train_x, train_y = dataset.get_data(train)
-            test_x, test_y = dataset.get_data(test)
+        for train_recs, test_recs in dataset.split_leave_one_patient_out():
+            train_x, train_y = dataset.get_data(train_recs, "train")
+            test_x, test_y = dataset.get_data(test_recs, "test")
 
         Yields
         ------
