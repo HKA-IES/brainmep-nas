@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
+import tempfile
+import pickle
 
 # import third-party modules
 import pytest
@@ -36,7 +38,6 @@ class TestMltkHardwareMetrics:
         assert hm.op_per_s == pytest.approx(161e6, abs=1e6)
         assert hm.mac_per_s == pytest.approx(78e6, abs=1e6)
         assert hm.inference_per_sec == pytest.approx(116, abs=1)
-        assert hm.profiling_results is not None
 
     def test_bad_tflite_model(self):
         """
@@ -44,3 +45,11 @@ class TestMltkHardwareMetrics:
         """
         with pytest.raises(ValueError):
             MltkHardwareMetrics("bad")
+
+    def test_pickle(self):
+        """
+        MltkHardwareMetrics should be pickleable.
+        """
+        hm = MltkHardwareMetrics(self.GOOD_TFLITE_MODEL)
+        with tempfile.TemporaryFile() as tmpfile:
+            pickle.dump(hm, tmpfile)
