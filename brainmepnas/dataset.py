@@ -64,7 +64,7 @@ class Dataset:
             self._train_records[patient] = val["train_records"]
             self._test_records[patient] = val["test_records"]
             self._patients.append(patient)
-            self._nb_records_per_patient[patient] = len(self._train_records[id])
+            self._nb_records_per_patient[patient] = len(self._train_records[patient])
 
         sample_data_file_path = (self._directory /
                                  self._train_records[self.patients[0]][0])
