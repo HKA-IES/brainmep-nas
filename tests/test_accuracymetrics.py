@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
+import tempfile
+import pickle
 
 # import third-party modules
 import pytest
 import numpy as np
 
 # import your own module
-from brainmepnas.accuracymetrics import AccuracyMetrics
+from brainmepnas import AccuracyMetrics
 
 
 class TestAccuracyMetrics:
@@ -477,6 +479,34 @@ class TestAccuracyMetrics:
                          }
 
         assert am.as_dict() == expected_dict
+
+    def test_pickle(self):
+        """
+        AccuracyMetrics should be pickleable.
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                           0, 0, 1, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 1, 1, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+        y_pred = np.array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           1, 1, 1, 1, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=4, sample_offset=1,
+                             threshold=0.5, event_minimum_overlap=2,
+                             event_preictal_tolerance=1,
+                             event_postictal_tolerance=2,
+                             event_minimum_separation=2,
+                             event_maximum_duration=12)
+
+        with tempfile.TemporaryFile() as tmpfile:
+            pickle.dump(am, tmpfile)
 
     def test_non_flat_array(self):
         """
