@@ -214,7 +214,7 @@ class Dataset:
         return len(self.patients)
 
     @property
-    def patients(self) -> list[str]:
+    def patients(self) -> List[str]:
         """
         List of patients in dataset.
         """
