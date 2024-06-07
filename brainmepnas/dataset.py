@@ -221,7 +221,7 @@ class Dataset:
         return self._patients[:]
 
     @property
-    def nb_records_per_patient(self) -> Dict[str: int]:
+    def nb_records_per_patient(self) -> Dict[str, int]:
         """
         Number of records per patient
         """
