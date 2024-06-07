@@ -75,7 +75,7 @@ class Dataset:
 
     def get_data(self, patients_records: Union[str, Dict[str, Union[str, List[int]]]],
                  set: Literal["train", "test"], shuffle: bool = False,
-                 shuffle_seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
+                 shuffle_seed: int = 42) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns the train or test data and labels for the desired
         patients-records map.
@@ -221,7 +221,7 @@ class Dataset:
         return self._patients[:]
 
     @property
-    def nb_records_per_patient(self) -> dict[str: int]:
+    def nb_records_per_patient(self) -> Dict[str: int]:
         """
         Number of records per patient
         """
@@ -265,7 +265,7 @@ class Dataset:
         return self._test_window_offset
 
     @property
-    def data_shape(self) -> tuple[int, int]:
+    def data_shape(self) -> Tuple[int, int]:
         """
         Shape of each data point (samples, channels)
         """
