@@ -240,7 +240,7 @@ class AbstractModelStudy(abc.ABC):
         No exception is raised if a step of the test fails. All information is
         provided in warnings.
 
-        # TODO: Self-test outer loop
+        # TODO: Self-test every single fold?
         """
         # Check that all attributes are defined.
         # Adapted from https://stackoverflow.com/a/55544173
@@ -272,25 +272,48 @@ class AbstractModelStudy(abc.ABC):
             print(f"Exception in _sample_search_space():")
             raise e
 
-        # _get_accuracy_metrics
+        # _get_accuracy_metrics, inner loop
         try:
             am = cls._get_accuracy_metrics(trial, "inner", 0, 1)
         except Exception as e:
-            print(f"Exception in _get_accuracy_metrics():")
+            print(f"Exception in _get_accuracy_metrics() with loop='inner':")
             raise e
         else:
             if not isinstance(am, AccuracyMetrics):
-                raise TypeError(f"_get_accuracy_metrics() returned unexpected type: {type(am)}")
+                raise TypeError(f"_get_accuracy_metrics() with loop='inner' returned unexpected type: {type(am)}")
 
-        # _get_hardware_metrics
+        # _get_accuracy_metrics, outer loop
+        try:
+            am = cls._get_accuracy_metrics(trial, "outer", 0)
+        except Exception as e:
+            print(
+                f"Exception in _get_accuracy_metrics() with loop='outer':")
+            raise e
+        else:
+            if not isinstance(am, AccuracyMetrics):
+                raise TypeError(f"_get_accuracy_metrics() with loop='outer' returned unexpected type: {type(am)}")
+
+        # _get_hardware_metrics, inner loop
         try:
             hm = cls._get_hardware_metrics(trial, "inner", 0, 1)
         except Exception as e:
-            print(f"Exception in _get_hardware_metrics():")
+            print(f"Exception in _get_hardware_metrics() with loop='inner':")
             raise e
         else:
             if not isinstance(hm, HardwareMetrics):
-                raise TypeError(f"_get_hardware_metrics() returned unexpected type: {type(hm)}")
+                raise TypeError(f"_get_hardware_metrics() with loop='inner' returned unexpected type: {type(hm)}")
+
+        # _get_hardware_metrics, outer loop
+        try:
+            hm = cls._get_hardware_metrics(trial, "inner", 0)
+        except Exception as e:
+            print(
+                f"Exception in _get_hardware_metrics() with loop='outer':")
+            raise e
+        else:
+            if not isinstance(hm, HardwareMetrics):
+                raise TypeError(
+                    f"_get_hardware_metrics() with loop='outer' returned unexpected type: {type(hm)}")
 
         # _get_combined_metrics
         try:
