@@ -96,11 +96,14 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
                               inner_fold: Optional[int] = None) -> AccuracyMetrics:
         """
-        Calculate the accuracy metrics for a given trial and inner fold. This
-        function is called by the public get_accuracy_metrics(), which
-        additionally pickles the AccuracyMetrics object.
+        Calculate the accuracy metrics for a given trial and inner/outer loop
+        iteration. This private method is called by the public method
+        get_accuracy_metrics(), which additionally pickles the AccuracyMetrics
+        object and tracks estimated carbon emissions.
 
         If your implementation benefits from a GPU, set
         GET_ACCURACY_METRICS_USE_GPU=True.
@@ -125,8 +128,17 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
+        outer_fold: int
+            Outer fold.
         inner_fold: int, optional
             Inner fold.
+
 
         Returns
         -------
@@ -137,11 +149,14 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
                               inner_fold: Optional[int] = None) -> HardwareMetrics:
         """
-        Calculate the hardware metrics for a given trial and inner fold. This
-        function is called by the public get_hardware_metrics(), which
-        additionally pickles the HardwareMetrics object.
+        Calculate the hardware metrics for a given trial and inner/outer loop
+        iteration. This private method is called by the public method
+        get_hardware_metrics(), which additionally pickles the HardwareMetrics
+        object and tracks estimated carbon emissions.
 
         If your implementation benefits from a GPU, set
         GET_HARDWARE_METRICS_USE_GPU=True.
@@ -166,6 +181,14 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
+        outer_fold: int
+            Outer fold.
         inner_fold: int, optional
             Inner fold.
 
@@ -216,6 +239,8 @@ class AbstractModelStudy(abc.ABC):
 
         No exception is raised if a step of the test fails. All information is
         provided in warnings.
+
+        # TODO: Self-test outer loop
         """
         # Check that all attributes are defined.
         # Adapted from https://stackoverflow.com/a/55544173
@@ -249,7 +274,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_accuracy_metrics
         try:
-            am = cls._get_accuracy_metrics(trial, 0)
+            am = cls._get_accuracy_metrics(trial, "inner", 0, 1)
         except Exception as e:
             print(f"Exception in _get_accuracy_metrics():")
             raise e
@@ -259,7 +284,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_hardware_metrics
         try:
-            hm = cls._get_hardware_metrics(trial, 0)
+            hm = cls._get_hardware_metrics(trial, "inner", 0, 1)
         except Exception as e:
             print(f"Exception in _get_hardware_metrics():")
             raise e
@@ -333,7 +358,7 @@ class AbstractModelStudy(abc.ABC):
             study.set_user_attr("sampler_path", str(sampler_path.resolve()))
 
             run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
-                                     sampler_path)
+                                     sampler_path, outer_fold)
             run_study_sh_path = cls._create_run_study_sh(outer_fold_dir, run_trial_sh_path)
             run_study_files.append(run_study_sh_path)
         cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
@@ -386,11 +411,14 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: Optional[int] = None) -> AccuracyMetrics:
+                             loop: Literal["inner", "outer"],
+                             inner_fold: Optional[int] = None) -> AccuracyMetrics:
         """
-        Calculate and save accuracy metrics for a specific trial and inner fold
-        to the trial directory as
-        inner_fold_{inner_fold}_accuracy_metrics.pickle.
+        Calculate and save accuracy metrics for a specific trial and
+        inner/outer loop iteration to the trial directory as
+        inner_fold_{inner_fold}_accuracy_metrics.pickle or
+        outer_fold_{outer_fold}_accuracy_metrics.pickle. Carbon emissions are
+        tracked and saved to emissions.csv.
 
         This is called depending on the value of GET_ACCURACY_METRICS_CALL:
             "once": called once, independently of inner_fold. If
@@ -408,7 +436,13 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
-        inner_fold: int
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
+        inner_fold: int, optional
             Inner fold.
 
         Returns
@@ -417,11 +451,30 @@ class AbstractModelStudy(abc.ABC):
             AccuracyMetrics object.
         """
         start_time = time.time()
-        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        if inner_fold is None:
-            inner_fold = "all"
-        description = f"inner_fold_{inner_fold}_accuracy_metrics"
 
+        outer_fold = trial.study.user_attrs["outer_fold"]
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+
+        # Verify parameters
+        if loop not in ["inner", "outer"]:
+            raise ValueError("loop must be either 'inner' or 'outer'.")
+        if inner_fold is not None:
+            if not (0 <= inner_fold < cls.N_FOLDS):
+                raise ValueError("inner_fold must be an integer between 0 and "
+                                 "N_FOLDS.")
+            if inner_fold == outer_fold:
+                raise ValueError("inner_fold cannot be equal to outer_fold.")
+
+        # Prepare description
+        if loop == "inner":
+            if inner_fold is None:
+                description = f"inner_fold_all_accuracy_metrics"
+            else:
+                description = f"inner_fold_{inner_fold}_accuracy_metrics"
+        elif loop == "outer":
+            description = f"outer_fold_{outer_fold}_accuracy_metrics"
+
+        # Start carbon tracking
         tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
                                                      project_name=description,
                                                      tracking_mode="process",
@@ -429,24 +482,31 @@ class AbstractModelStudy(abc.ABC):
                                                      log_level="WARNING")
         tracker.start()
 
-        am = cls._get_accuracy_metrics(trial, inner_fold)
+        # Call user implementation
+        am = cls._get_accuracy_metrics(trial, loop, outer_fold, inner_fold)
 
+        # End carbon tracking
         tracker.stop()
 
+        # Pickle AccuracyMetrics object
         am_path = trial_dir / (description + ".pickle")
         pickle.dump(am, open(am_path, "wb"))
 
+        # Save duration to trial attributes
         duration = time.time() - start_time
-        trial.set_user_attr(f"get_accuracy_metrics_{inner_fold}_duration", duration)
+        trial.set_user_attr(f"{description}_duration", duration)
         return am
 
     @classmethod
     def get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: Optional[int] = None) -> HardwareMetrics:
+                             loop: Literal["inner", "outer"],
+                             inner_fold: Optional[int] = None) -> HardwareMetrics:
         """
-        Calculate and save hardware metrics for a specific trial and inner fold
-        to the trial directory as
-        inner_fold_{inner_fold}_hardware_metrics.pickle.
+        Calculate and save hardware metrics for a specific trial and
+        inner/outer loop iteration to the trial directory as
+        inner_fold_{inner_fold}_hardware_metrics.pickle or
+        outer_fold_{outer_fold}_hardware_metrics.pickle. Carbon emissions are
+        tracked and saved to emissions.csv.
 
         This is called depending on the value of GET_HARDWARE_METRICS_CALL:
             "once": called once, independently of inner_fold. If
@@ -464,6 +524,12 @@ class AbstractModelStudy(abc.ABC):
         ----------
         trial: optuna.Trial
             Optuna trial object.
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
         inner_fold: int, optional
             Inner fold.
 
@@ -473,11 +539,30 @@ class AbstractModelStudy(abc.ABC):
             HardwareMetrics object.
         """
         start_time = time.time()
-        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        if inner_fold is None:
-            inner_fold = "all"
-        description = f"inner_fold_{inner_fold}_hardware_metrics"
 
+        outer_fold = trial.study.user_attrs["outer_fold"]
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+
+        # Verify parameters
+        if loop not in ["inner", "outer"]:
+            raise ValueError("loop must be either 'inner' or 'outer'.")
+        if inner_fold is not None:
+            if not (0 <= inner_fold < cls.N_FOLDS):
+                raise ValueError("inner_fold must be an integer between 0 and "
+                                 "N_FOLDS.")
+            if inner_fold == outer_fold:
+                raise ValueError("inner_fold cannot be equal to outer_fold.")
+
+        # Prepare description
+        if loop == "inner":
+            if inner_fold is None:
+                description = f"inner_fold_all_hardware_metrics"
+            else:
+                description = f"inner_fold_{inner_fold}_hardware_metrics"
+        elif loop == "outer":
+            description = f"outer_fold_{outer_fold}_hardware_metrics"
+
+        # Start carbon tracking
         tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
                                                      project_name=description,
                                                      tracking_mode="process",
@@ -485,40 +570,51 @@ class AbstractModelStudy(abc.ABC):
                                                      log_level="WARNING")
         tracker.start()
 
-        hm = cls._get_hardware_metrics(trial, inner_fold)
+        # Call user implementation
+        hm = cls._get_hardware_metrics(trial, loop, outer_fold, inner_fold)
 
+        # End carbon tracking
         tracker.stop()
 
+        # Pickle HardwareMetrics object
         hm_path = trial_dir / (description + ".pickle")
         pickle.dump(hm, open(hm_path, "wb"))
 
+        # Save duration to trial attributes
         duration = time.time() - start_time
-        trial.set_user_attr(f"get_hardware_metrics_{inner_fold}_duration",
-                            duration)
+        trial.set_user_attr(f"{description}_duration", duration)
         return hm
 
     @classmethod
-    def get_combined_metrics(cls, trial: optuna.Trial,
-                             inner_fold: int,
-                             accuracy_metrics: AccuracyMetrics,
-                             hardware_metrics: HardwareMetrics) -> CombinedMetrics:
+    def get_combined_metrics(cls, accuracy_metrics: AccuracyMetrics,
+                             hardware_metrics: HardwareMetrics,
+                             trial: optuna.Trial,
+                             loop: Literal["inner", "outer"],
+                             inner_fold: Optional[int] = None) -> CombinedMetrics:
         """
         Calculate and save combined metrics from accuracy and hardware metrics
         to the trial directory as
-        inner_fold_{inner_fold}_hardware_metrics.pickle.
+        inner_fold_{inner_fold}_combined_metrics.pickle or
+        outer_fold_{outer_fold}_combined_metrics.pickle.
 
         This is called after processing all folds.
 
         Parameters
         ----------
-        trial: optuna.Trial
-            Optuna trial object.
-        inner_fold: int
-            Inner fold.
         accuracy_metrics: AccuracyMetrics
             AccuracyMetrics object.
         hardware_metrics: HardwareMetrics
             HardwareMetrics object
+        trial: optuna.Trial
+            Optuna trial object.
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
+        inner_fold: int, optional
+            Inner fold.
 
         Returns
         -------
@@ -526,9 +622,30 @@ class AbstractModelStudy(abc.ABC):
             CombinedMetrics object.
         """
         start_time = time.time()
-        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
-        description = f"inner_fold_{inner_fold}_combined_metrics"
 
+        outer_fold = trial.study.user_attrs["outer_fold"]
+        trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+
+        # Verify parameters
+        if loop not in ["inner", "outer"]:
+            raise ValueError("loop must be either 'inner' or 'outer'.")
+        if inner_fold is not None:
+            if not (0 <= inner_fold < cls.N_FOLDS):
+                raise ValueError("inner_fold must be an integer between 0 and "
+                                 "N_FOLDS.")
+            if inner_fold == outer_fold:
+                raise ValueError("inner_fold cannot be equal to outer_fold.")
+
+        # Prepare description
+        if loop == "inner":
+            if inner_fold is None:
+                description = f"inner_fold_all_combined_metrics"
+            else:
+                description = f"inner_fold_{inner_fold}_combined_metrics"
+        elif loop == "outer":
+            description = f"outer_fold_{outer_fold}_combined_metrics"
+
+        # Start carbon tracking
         tracker = codecarbon.OfflineEmissionsTracker(country_iso_code="DEU",
                                                      project_name=description,
                                                      tracking_mode="process",
@@ -536,104 +653,144 @@ class AbstractModelStudy(abc.ABC):
                                                      log_level="WARNING")
         tracker.start()
 
+        # Call user implementation
         cm = cls._get_combined_metrics(accuracy_metrics, hardware_metrics)
 
+        # End carbon tracking
         tracker.stop()
 
+        # Pickle CombinedMetrics object
         cm_path = trial_dir / (description + ".pickle")
         pickle.dump(cm, open(cm_path, "wb"))
 
+        # Save duration to trial attributes
         duration = time.time() - start_time
-        trial.set_user_attr(f"get_combined_metrics_{inner_fold}_duration",
-                            duration)
+        trial.set_user_attr(f"{description}_duration", duration)
         return cm
 
     @classmethod
-    def complete_trial(cls, trial: optuna.Trial):
+    def complete_trial(cls, trial: optuna.Trial,
+                       loop: Literal["inner", "outer"]):
         """
-        Complete the given trial by compiling the produced metrics, extracting
-        the desired objectives, and reporting the objectives to the study.
+        Complete the given trial by compiling the produced metrics and
+        exporting them to a .csv file.
+
+        If loop=inner, the objectives are extracted and reported to the study.
+        If loop=outer, nothing more is done because the trial was already
+        completed.
 
         Parameters
         ----------
         trial: optuna.Trial
             Trial object.
+        loop: Literal["inner", "outer"]
+            Whether we are in the inner or outer loop of the nested
+            cross-validation. In the inner loop, the outer fold is excluded
+            from the data and the inner fold is used for testing. In the outer
+            loop, the outer fold is used for testing and the remaining data is
+            used for training.
         """
         start_time = time.time()
 
         study = trial.study
+        outer_fold = study.user_attrs["outer_fold"]
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
 
-        n_inner_folds = cls.N_FOLDS - 1
+        # Verify parameter
+        if loop not in ["inner", "outer"]:
+            raise ValueError("loop must be either 'inner' or 'outer'.")
 
-        metrics_dicts = []
+        if loop == "inner":
+            # TODO: Ensure that there is no overlap between inner_folds and outer_fold.
+            inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
 
-        try:
-            for f in range(n_inner_folds):
-                if cls.GET_ACCURACY_METRICS_CALL == "once":
-                    am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
-                    am = pickle.load(open(am_path, "rb"))
-                elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
-                    am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
-                    am = pickle.load(open(am_path, "rb"))
-                else:
-                    am = None
+            metrics_dicts = []
 
-                if cls.GET_HARDWARE_METRICS_CALL == "once":
-                    hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
-                    hm = pickle.load(open(hm_path, "rb"))
-                elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
-                    hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
-                    hm = pickle.load(open(hm_path, "rb"))
-                else:
-                    hm = None
+            try:
+                # For each inner fold, get CombinedMetrics from AccuracyMetrics
+                # and HardwareMetrics
+                for f in inner_folds:
+                    if cls.GET_ACCURACY_METRICS_CALL == "once":
+                        am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
+                        am = pickle.load(open(am_path, "rb"))
+                    elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
+                        am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
+                        am = pickle.load(open(am_path, "rb"))
+                    else:
+                        am = None
 
-                if am is not None and hm is not None:
-                    cm = cls.get_combined_metrics(trial, f, am, hm)
-                else:
-                    cm = None
+                    if cls.GET_HARDWARE_METRICS_CALL == "once":
+                        hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
+                        hm = pickle.load(open(hm_path, "rb"))
+                    elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
+                        hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
+                        hm = pickle.load(open(hm_path, "rb"))
+                    else:
+                        hm = None
 
-                d = {"inner_fold": f}
-                if am is not None:
-                    d.update(am.as_dict())
-                if hm is not None:
-                    d.update(hm.as_dict())
-                if cm is not None:
-                    d.update(cm.as_dict())
-                metrics_dicts.append(d)
-        except FileNotFoundError:
-            # Fail trial if one of the expected metrics file is absent.
-            duration = time.time() - start_time
-            trial.set_user_attr(f"complete_trial_duration", duration)
-            study.tell(trial, state=optuna.trial.TrialState.FAIL)
-            sampler_path = cls.get_sampler_path(study)
-            pickle.dump(study.sampler, open(sampler_path, "wb"))
-            return None
+                    if am is not None and hm is not None:
+                        cm = cls.get_combined_metrics(am, hm, trial, loop, f)
+                    else:
+                        cm = None
 
-        df = pd.DataFrame.from_records(metrics_dicts)
-        df.to_csv(trial_dir / "metrics.csv")
+                    d = {"inner_fold": f}
+                    if am is not None:
+                        d.update(am.as_dict())
+                    if hm is not None:
+                        d.update(hm.as_dict())
+                    if cm is not None:
+                        d.update(cm.as_dict())
+                    metrics_dicts.append(d)
+            except FileNotFoundError:
+                # Fail trial if one of the expected metrics file is absent.
+                duration = time.time() - start_time
+                trial.set_user_attr(f"complete_trial_duration", duration)
+                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                sampler_path = cls.get_sampler_path(study)
+                pickle.dump(study.sampler, open(sampler_path, "wb"))
+                return None
 
-        try:
-            obj_1_value = df[cls.OBJ_1_METRIC].mean()
-            obj_1_value_scaled = cls.OBJ_1_SCALING(obj_1_value)
+            # Save all metrics to .csv file.
+            df = pd.DataFrame.from_records(metrics_dicts)
+            df.to_csv(trial_dir / "metrics.csv")
 
-            obj_2_value = df[cls.OBJ_2_METRIC].mean()
-            obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
-        except KeyError:
-            # Fail trial if objective is not found in the metrics.
-            duration = time.time() - start_time
-            trial.set_user_attr(f"complete_trial_duration", duration)
-            study.tell(trial, state=optuna.trial.TrialState.FAIL)
-            sampler_path = cls.get_sampler_path(study)
-            pickle.dump(study.sampler, open(sampler_path, "wb"))
-        else:
-            trial.set_user_attr(cls.OBJ_1_METRIC, obj_1_value)
-            trial.set_user_attr(cls.OBJ_2_METRIC, obj_2_value)
-            duration = time.time() - start_time
-            trial.set_user_attr(f"complete_trial_duration", duration)
-            study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
-            sampler_path = cls.get_sampler_path(study)
-            pickle.dump(study.sampler, open(sampler_path, "wb"))
+            # Report objectives to trial.
+            try:
+                obj_1_value = df[cls.OBJ_1_METRIC].mean()
+                obj_1_value_scaled = cls.OBJ_1_SCALING(obj_1_value)
+
+                obj_2_value = df[cls.OBJ_2_METRIC].mean()
+                obj_2_value_scaled = cls.OBJ_2_SCALING(obj_2_value)
+            except KeyError:
+                # Fail trial if objective is not found in the metrics.
+                duration = time.time() - start_time
+                trial.set_user_attr(f"complete_trial_duration", duration)
+                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+                sampler_path = cls.get_sampler_path(study)
+                pickle.dump(study.sampler, open(sampler_path, "wb"))
+            else:
+                trial.set_user_attr(cls.OBJ_1_METRIC, obj_1_value)
+                trial.set_user_attr(cls.OBJ_2_METRIC, obj_2_value)
+                duration = time.time() - start_time
+                trial.set_user_attr(f"complete_trial_duration", duration)
+                study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
+                sampler_path = cls.get_sampler_path(study)
+                pickle.dump(study.sampler, open(sampler_path, "wb"))
+        elif loop == "outer":
+            # Get CombinedMetrics from AccuracyMetrics and HardwareMetrics
+            am_path = trial_dir / f"outer_fold_{outer_fold}_accuracy_metrics.pickle"
+            am = pickle.load(open(am_path, "rb"))
+            hm_path = trial_dir / f"outer_fold_{outer_fold}_hardware_metrics.pickle"
+            hm = pickle.load(open(hm_path, "rb"))
+            cm = cls.get_combined_metrics(am, hm, trial, loop)
+            d = {"outer_fold": outer_fold}
+            d.update(am.as_dict())
+            d.update(hm.as_dict())
+            d.update(cm.as_dict())
+
+            # Save all metrics to .csv file.
+            df = pd.DataFrame.from_records([d])
+            df.to_csv(trial_dir / f"outer_fold_{outer_fold}_metrics.csv")
 
     @classmethod
     def get_outer_fold(cls, study: optuna.Study) -> int:
@@ -700,7 +857,7 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def _create_run_trial_sh(cls, target_dir: pathlib.Path,
                              study_storage: str, study_name: str,
-                             sampler_path: pathlib.Path) -> pathlib.Path:
+                             sampler_path: pathlib.Path, outer_fold: int) -> pathlib.Path:
         """
         Generate run_trial.sh script in target_dir.
         """
@@ -743,30 +900,30 @@ class AbstractModelStudy(abc.ABC):
         # Call once
         if cls.GET_ACCURACY_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()})"]
+            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop)"]
 
         if cls.GET_HARDWARE_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
             if cls.GET_ACCURACY_METRICS_CALL == "once":
                 # Wait for last get_accuracy_metrics job to complete.
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
             else:
-                lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()})"]
+                lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
 
         # Call per_inner_fold
-        n_inner_folds = cls.N_FOLDS-1
-        for inner_fold in range(n_inner_folds):
+        inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
+        for inner_fold in inner_folds:
             if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
 
             if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
                 if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
                     # Wait for last get_accuracy_metrics job to complete.
-                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
                 else:
-                    lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} -i {inner_fold})"]
+                    lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
 
         # Wait for all jobs to complete
         lines += [""]
@@ -775,7 +932,7 @@ class AbstractModelStudy(abc.ABC):
 
         lines += ["",
                   "# Complete trial",
-                  f"python {cls.THIS_FILE} complete_trial -t {trial_path.resolve()}",
+                  f"python {cls.THIS_FILE} complete_trial -t {trial_path.resolve()} --inner-loop",
                   "",
                   "echo 'Trial complete.'"]
 
@@ -853,17 +1010,7 @@ class AbstractModelStudy(abc.ABC):
 
         ```
         class MyModelStudy(AbstractModelStudy):
-            @classmethod
-            def run_before_all_folds(cls):
-                pass
-
-            @classmethod
-            def run_fold(cls, fold):
-                pass
-
-            @classmethod
-            def run_after_all_folds(cls):
-                pass
+            [...]
 
 
         if __name__ == "__main__":
@@ -904,6 +1051,10 @@ class AbstractModelStudy(abc.ABC):
         get_hardware_metrics_params = [
             click.Option(["-t", "--trial-path", "trial_path"],
                          type=str, required=True),
+        click.Option(["--inner-loop", "inner_loop"],
+                     is_flag=True, default=False),
+        click.Option(["--outer-loop", "outer_loop"],
+                     is_flag=True, default=False),
             click.Option(["-i", "--inner-fold", "inner_fold"],
                          type=int, required=False)]
         get_hardware_metrics_cmd = click.Command("get_hardware_metrics",
@@ -914,6 +1065,10 @@ class AbstractModelStudy(abc.ABC):
         get_accuracy_metrics_params = [
             click.Option(["-t", "--trial-path", "trial_path"],
                          type=str, required=True),
+            click.Option(["--inner-loop", "inner_loop"],
+                         is_flag=True, default=False),
+            click.Option(["--outer-loop", "outer_loop"],
+                         is_flag=True, default=False),
             click.Option(["-i", "--inner-fold", "inner_fold"],
                          type=int, required=False)]
         get_accuracy_metrics_cmd = click.Command("get_accuracy_metrics",
@@ -923,7 +1078,11 @@ class AbstractModelStudy(abc.ABC):
         # complete_trial()
         complete_trial_params = [click.Option(
                                      ["-t", "--trial-path", "trial_path"],
-                                     type=str, required=True)
+                                     type=str, required=True),
+            click.Option(["--inner-loop", "inner_loop"],
+                         is_flag=True, default=False),
+            click.Option(["--outer-loop", "outer_loop"],
+                         is_flag=True, default=False)
                            ]
         complete_trial_cmd = click.Command("complete_trial",
                                        callback=cls._cli_complete_trial,
@@ -974,7 +1133,8 @@ class AbstractModelStudy(abc.ABC):
         cls.init_trial(study)
 
     @classmethod
-    def _cli_get_hardware_metrics(cls, trial_path: str, inner_fold: int):
+    def _cli_get_hardware_metrics(cls, trial_path: str, inner_loop: bool,
+                                  outer_loop: bool, inner_fold: int):
         """
         Command-line entry point for get_hardware_metrics().
 
@@ -983,10 +1143,25 @@ class AbstractModelStudy(abc.ABC):
         [...]
         """
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
-        _ = cls.get_hardware_metrics(trial, inner_fold)
+
+        if inner_loop == outer_loop:
+            if inner_loop is True:
+                raise ValueError("Only one of --inner-loop or --outer-loop "
+                                 "should be set.")
+            else:
+                raise ValueError("One of --inner-loop or --outer-loop should "
+                                 "be set.")
+
+        if inner_loop is True:
+            loop = "inner"
+        else:
+            loop = "outer"
+
+        _ = cls.get_hardware_metrics(trial, loop, inner_fold)
 
     @classmethod
-    def _cli_get_accuracy_metrics(cls, trial_path: str, inner_fold: int):
+    def _cli_get_accuracy_metrics(cls, trial_path: str, inner_loop: bool,
+                                  outer_loop: bool, inner_fold: int):
         """
         Command-line entry point for get_accuracy_metrics().
 
@@ -995,12 +1170,41 @@ class AbstractModelStudy(abc.ABC):
         [...]
         """
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
-        _ = cls.get_accuracy_metrics(trial, inner_fold)
+
+        if inner_loop == outer_loop:
+            if inner_loop is True:
+                raise ValueError("Only one of --inner-loop or --outer-loop "
+                                 "should be set.")
+            else:
+                raise ValueError("One of --inner-loop or --outer-loop should "
+                                 "be set.")
+
+        if inner_loop is True:
+            loop = "inner"
+        else:
+            loop = "outer"
+
+        _ = cls.get_accuracy_metrics(trial, loop, inner_fold)
 
     @classmethod
-    def _cli_complete_trial(cls, trial_path: str):
+    def _cli_complete_trial(cls, trial_path: str, inner_loop: bool,
+                                  outer_loop: bool):
         """
         Command-line entry point for the function complete_trial().
         """
         trial: optuna.Trial = pickle.load(open(trial_path, "rb"))
-        cls.complete_trial(trial)
+
+        if inner_loop == outer_loop:
+            if inner_loop is True:
+                raise ValueError("Only one of --inner-loop or --outer-loop "
+                                 "should be set.")
+            else:
+                raise ValueError("One of --inner-loop or --outer-loop should "
+                                 "be set.")
+
+        if inner_loop is True:
+            loop = "inner"
+        else:
+            loop = "outer"
+
+        cls.complete_trial(trial, loop)

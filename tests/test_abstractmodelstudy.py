@@ -18,6 +18,7 @@ from badmodelstudy import BadModelStudy
 
 
 class TestAbstractModelStudy:
+
     @staticmethod
     def delete_model_study_directory(model_study: Type[AbstractModelStudy]):
         """
@@ -39,9 +40,9 @@ class TestAbstractModelStudy:
         with pytest.raises(NotImplementedError):
             AbstractModelStudy._sample_search_space(None)
         with pytest.raises(NotImplementedError):
-            AbstractModelStudy._get_accuracy_metrics(None, None)
+            AbstractModelStudy._get_accuracy_metrics(None, None, None)
         with pytest.raises(NotImplementedError):
-            AbstractModelStudy._get_hardware_metrics(None, None)
+            AbstractModelStudy._get_hardware_metrics(None, None, None)
 
     def test_implementation_not_instantiable(self):
         with pytest.raises(RuntimeError):
@@ -106,7 +107,7 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_get_accuracy_metrics(self, mocker):
+    def test_get_accuracy_metrics_inner_loop(self, mocker):
         GoodModelStudy.setup()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -121,7 +122,7 @@ class TestAbstractModelStudy:
         mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_accuracy_metrics")
         mocked_method.return_value = None
 
-        am = GoodModelStudy.get_accuracy_metrics(trial, 1)
+        am = GoodModelStudy.get_accuracy_metrics(trial, "inner", 1)
 
         mocked_method.assert_called_once()
         assert pickle.load(open(trial_dir / "inner_fold_1_accuracy_metrics.pickle", "rb")) == am
@@ -132,7 +133,59 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_get_hardware_metrics(self, mocker):
+    def test_get_accuracy_metrics_inner_loop_all_folds(self, mocker):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_accuracy_metrics")
+        mocked_method.return_value = None
+
+        am = GoodModelStudy.get_accuracy_metrics(trial, "inner", None)
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_all_accuracy_metrics.pickle", "rb")) == am
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_get_accuracy_metrics_outer_loop(self, mocker):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_accuracy_metrics")
+        mocked_method.return_value = None
+
+        am = GoodModelStudy.get_accuracy_metrics(trial, "outer")
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "outer_fold_0_accuracy_metrics.pickle", "rb")) == am
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_get_hardware_metrics_inner_loop(self, mocker):
         GoodModelStudy.setup()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -147,7 +200,7 @@ class TestAbstractModelStudy:
         mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_hardware_metrics")
         mocked_method.return_value = None
 
-        hm = GoodModelStudy.get_hardware_metrics(trial, 1)
+        hm = GoodModelStudy.get_hardware_metrics(trial, "inner", 1)
 
         mocked_method.assert_called_once()
         assert pickle.load(open(trial_dir / "inner_fold_1_hardware_metrics.pickle", "rb")) == hm
@@ -158,7 +211,59 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_get_combined_metrics(self, mocker):
+    def test_get_hardware_metrics_inner_loop_all_folds(self, mocker):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_hardware_metrics")
+        mocked_method.return_value = None
+
+        hm = GoodModelStudy.get_hardware_metrics(trial, "inner")
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_all_hardware_metrics.pickle", "rb")) == hm
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_get_hardware_metrics_outer_loop(self, mocker):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_hardware_metrics")
+        mocked_method.return_value = None
+
+        hm = GoodModelStudy.get_hardware_metrics(trial, "outer")
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "outer_fold_0_hardware_metrics.pickle", "rb")) == hm
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_get_combined_metrics_inner_loop(self, mocker):
         GoodModelStudy.setup()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -173,7 +278,8 @@ class TestAbstractModelStudy:
         mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_combined_metrics")
         mocked_method.return_value = None
 
-        cm = GoodModelStudy.get_combined_metrics(trial, 1, None, None)
+        cm = GoodModelStudy.get_combined_metrics(None, None,
+                                                 trial, "inner", 1)
 
         mocked_method.assert_called_once()
         assert pickle.load(open(trial_dir / "inner_fold_1_combined_metrics.pickle", "rb")) == cm
@@ -184,7 +290,7 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_complete_trial(self):
+    def test_get_combined_metrics_inner_loop_all_folds(self, mocker):
         GoodModelStudy.setup()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -194,14 +300,16 @@ class TestAbstractModelStudy:
                                   storage=study_storage)
 
         trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
 
-        GoodModelStudy.get_hardware_metrics(trial)
-        GoodModelStudy.get_accuracy_metrics(trial, 0)
-        GoodModelStudy.get_accuracy_metrics(trial, 1)
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_combined_metrics")
+        mocked_method.return_value = None
 
-        assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
-        GoodModelStudy.complete_trial(trial)
-        assert study.trials[-1].state == optuna.trial.TrialState.COMPLETE
+        cm = GoodModelStudy.get_combined_metrics(None, None,
+                                                 trial, "inner")
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "inner_fold_all_combined_metrics.pickle", "rb")) == cm
 
         # Properly close connection to the storage
         study_storage.remove_session()
@@ -209,7 +317,61 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_complete_trial_metrics_missing(self):
+    def test_get_combined_metrics_outer_loop(self, mocker):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        mocked_method = mocker.patch("goodmodelstudy.GoodModelStudy._get_combined_metrics")
+        mocked_method.return_value = None
+
+        cm = GoodModelStudy.get_combined_metrics(None, None,
+                                                 trial, "outer")
+
+        mocked_method.assert_called_once()
+        assert pickle.load(open(trial_dir / "outer_fold_0_combined_metrics.pickle", "rb")) == cm
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_complete_trial_inner_loop(self):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        GoodModelStudy.get_hardware_metrics(trial, "inner")
+        GoodModelStudy.get_accuracy_metrics(trial, "inner", 1)
+        GoodModelStudy.get_accuracy_metrics(trial, "inner", 2)
+
+        assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
+        GoodModelStudy.complete_trial(trial, "inner")
+        assert study.trials[-1].state == optuna.trial.TrialState.COMPLETE
+        assert os.path.isfile(trial_dir / "metrics.csv")
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_complete_trial_inner_loop_metrics_missing(self):
         GoodModelStudy.setup()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -225,8 +387,32 @@ class TestAbstractModelStudy:
         #DummyModelStudy1.get_accuracy_metrics(trial, 1)
 
         assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
-        GoodModelStudy.complete_trial(trial)
+        GoodModelStudy.complete_trial(trial, "inner")
         assert study.trials[-1].state == optuna.trial.TrialState.FAIL
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_complete_trial_outer_loop(self):
+        GoodModelStudy.setup()
+        study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        study_name = GoodModelStudy.NAME + "_outer_fold_0"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        trial = GoodModelStudy.init_trial(study)
+        trial_dir = GoodModelStudy.get_trial_dir(trial)
+
+        GoodModelStudy.get_hardware_metrics(trial, "outer")
+        GoodModelStudy.get_accuracy_metrics(trial, "outer")
+        GoodModelStudy.complete_trial(trial, "outer")
+
+        assert os.path.isfile(trial_dir / "outer_fold_0_metrics.csv")
 
         # Properly close connection to the storage
         study_storage.remove_session()

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
-from typing import Dict, Any
+from typing import Dict, Any, Literal, Optional
 import pathlib
 
 # import third-party modules
@@ -50,7 +50,9 @@ class GoodModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> AccuracyMetrics:
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
+                              inner_fold: Optional[int] = None) -> AccuracyMetrics:
         # Same setup as TestAccuracyMetrics.test_general_attributes()
         y_true = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -74,7 +76,9 @@ class GoodModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> HardwareMetrics:
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
+                              inner_fold: Optional[int] = None) -> HardwareMetrics:
         hm = HardwareMetrics(inference_time=1,
                              inference_energy=2)
         return hm
