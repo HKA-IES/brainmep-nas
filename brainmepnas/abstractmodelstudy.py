@@ -316,18 +316,31 @@ class AbstractModelStudy(abc.ABC):
         tempdir.cleanup()
 
     @classmethod
-    def setup(cls):
+    def setup_inner_loops(cls):
         """
         Setup a model study.
 
-        A model study is a collection of individual studies, which each
-        represent one outer fold of a nested cross-validation process. Nested
-        cross-validation is used to evaluate the generalization of the
-        optimization process.
+        A model study consists of an outer and an inner loop. The inner loop
+        is represented by an Optuna Study object and contains many trials. The
+        output of a single inner loop is a Pareto Set, which has been trained
+        and tested on a subset of the data for inner loop 1. The outer loop
+        consists in evaluating the generalization capability of the Pareto Set
+        yielded by the inner loop. In the outer loop, the Pareto Sets obtained
+        from each inner loop are re-trained and then tested with previously
+        unseen data.
 
-        Example: if the desired number of folds is 5, there will be 5 studies,
-        each leaving out one of the folds for testing and using the remaining
-        4 folds inside the study.
+        Example:
+            - Desired number of folds is 5, which means that the dataset is
+            split in 5.
+            - There is one inner loop per fold (in this case, 5), where each
+            inner loop is performed on the whole dataset excluding one fold.
+            For a given inner loop, 4 folds are made available.
+            - In each trial of an inner loop, a cross-validation process is
+            performed on the 4 folds: 4 models are trained, each with leaving
+            out one of the folds for testing. The trial performance is the
+            mean performance of all trials.
+
+        # TODO: Complete this documentation
 
         All data related to the model study are stored in BASE_DIR. All studies
         are placed in study_storage.db. Each study has a folder where scripts
@@ -346,7 +359,7 @@ class AbstractModelStudy(abc.ABC):
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
         # One study per outer fold
-        run_study_files = []
+        run_inner_loop_files = []
         for outer_fold in range(cls.N_FOLDS):
             outer_fold_dir = cls.BASE_DIR / f"outer_fold_{outer_fold}"
             os.mkdir(outer_fold_dir)
@@ -370,9 +383,43 @@ class AbstractModelStudy(abc.ABC):
 
             run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
                                      sampler_path, outer_fold)
-            run_study_sh_path = cls._create_run_study_sh(outer_fold_dir, run_trial_sh_path)
-            run_study_files.append(run_study_sh_path)
-        cls._create_run_model_study_sh(cls.BASE_DIR, run_study_files)
+            run_inner_loop_sh_path = cls._create_run_inner_loop_sh(outer_fold_dir, run_trial_sh_path)
+            run_inner_loop_files.append(run_inner_loop_sh_path)
+        cls._create_run_all_inner_loops_sh(cls.BASE_DIR, run_inner_loop_files)
+
+        # Properly close connection to the storage
+        study_storage.remove_session()
+        study_storage.scoped_session.get_bind().dispose()
+
+    @classmethod
+    def setup_outer_loop(cls):
+        """
+        Setup the outer loop of a model study.
+
+        The outer loop consists in fully training and testing the best trials
+        obtained for each inner loop.
+
+        Bash scripts are created ...
+
+        # TODO: Complete
+        """
+        study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+        study_storage = optuna.storages.RDBStorage(study_storage_url)
+
+        run_outer_loop_iteration_files = []
+        for outer_fold in range(cls.N_FOLDS):
+            study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
+            study = optuna.load_study(storage=study_storage,
+                                      study_name=study_name)
+            study_dir = pathlib.Path(study.user_attrs["study_dir"])
+            process_pareto_set_sh_path = (
+                cls._create_process_pareto_set_sh(study_dir,
+                                                  study.best_trials))
+            run_outer_loop_iteration_files.append(
+                process_pareto_set_sh_path)
+
+        cls._create_run_outer_loop_sh(cls.BASE_DIR,
+                                      run_outer_loop_iteration_files)
 
         # Properly close connection to the storage
         study_storage.remove_session()
@@ -797,6 +844,8 @@ class AbstractModelStudy(abc.ABC):
             df = pd.DataFrame.from_records([d])
             df.to_csv(trial_dir / f"outer_fold_{outer_fold}_metrics.csv")
 
+
+
     @classmethod
     def get_outer_fold(cls, study: optuna.Study) -> int:
         """
@@ -937,16 +986,16 @@ class AbstractModelStudy(abc.ABC):
         return file_path
 
     @classmethod
-    def _create_run_study_sh(cls, target_dir: pathlib.Path,
-                             run_trial_path: pathlib.Path):
+    def _create_run_inner_loop_sh(cls, target_dir: pathlib.Path,
+                                  run_trial_path: pathlib.Path):
         datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         lines = ["#!/bin/bash",
                  "",
                  "# NOTE: This script was automatically generated by",
-                 f"# {cls.__name__}._create_run_study_sh() on {datetime_str}",
+                 f"# {cls.__name__}._create_run_inner_loop_sh() on {datetime_str}",
                  "",
-                 f"echo 'Run study'",
+                 f"echo 'Run inner loop'",
                  "",
                  f"# {cls.N_TRIALS} trials.",
                  f"for i in {{0..{cls.N_TRIALS-1}}}",
@@ -954,9 +1003,9 @@ class AbstractModelStudy(abc.ABC):
                  f"    bash {run_trial_path.resolve()}",
                  "done",
                  "",
-                 "echo 'Study complete.'"]
+                 "echo 'Inner loop complete.'"]
 
-        file_path = target_dir / "run_study.sh"
+        file_path = target_dir / "run_inner_loop.sh"
 
         with open(file_path, "w") as f:
             f.writelines([line + "\n" for line in lines])
@@ -964,27 +1013,115 @@ class AbstractModelStudy(abc.ABC):
         return file_path
 
     @classmethod
-    def _create_run_model_study_sh(cls, target_dir: pathlib.Path,
-                                   run_study_paths: List[pathlib.Path]):
+    def _create_run_all_inner_loops_sh(cls, target_dir: pathlib.Path,
+                                       run_inner_loop_sh_files: List[pathlib.Path]):
         datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         lines = ["#!/bin/bash",
                  "",
                  "# NOTE: This script was automatically generated by",
-                 f"# {cls.__name__}._create_run_model_study_sh() on {datetime_str}",
+                 f"# {cls.__name__}._create_run_all_inner_loops_sh() on {datetime_str}",
                  "",
-                 f"echo 'Run model study'",
+                 f"echo 'Run all inner loops'",
                  ""]
 
-        for p in run_study_paths:
+        for p in run_inner_loop_sh_files:
             lines += [f"bash {p.resolve()}"]
 
         lines += ["",
-                  "echo 'Model study complete.'"]
+                  "echo 'All inner loops complete.'"]
 
-        file_path = target_dir / "run_model_study.sh"
+        file_path = target_dir / "run_all_inner_loops.sh"
 
-        with open(target_dir / "run_model_study.sh", "w") as f:
+        with open(file_path, "w") as f:
+            f.writelines([line + "\n" for line in lines])
+
+        return file_path
+
+    @classmethod
+    def _create_process_pareto_set_sh(cls, target_dir: pathlib.Path,
+                                      pareto_set: List[optuna.trial.FrozenTrial]):
+        datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        n_total_jobs = cls.N_PARALLEL_CPU_JOBS + cls.N_PARALLEL_GPU_JOBS
+
+        lines = ["#!/bin/bash",
+                 "",
+                 "# NOTE: This script was automatically generated by",
+                 f"# {cls.__name__}._create_process_pareto_set_sh() on {datetime_str}",
+                 "",
+                 f"echo 'Process Pareto set'",
+                 "",
+                 "# Configure task spooler",
+                 f"# {cls.N_PARALLEL_CPU_JOBS} CPU jobs + {cls.N_PARALLEL_GPU_JOBS} GPU jobs = {n_total_jobs} total jobs",
+                 f"ts -S {n_total_jobs}",
+                 "ts -C"]
+
+        if cls.GET_ACCURACY_METRICS_USE_GPU or cls.GET_HARDWARE_METRICS_USE_GPU:
+            lines += ["ts --set_gpu_free_perc 80"]
+
+        lines += ["",
+                 "# Queue jobs"]
+
+        if cls.GET_ACCURACY_METRICS_USE_GPU:
+            get_accuracy_metrics_gpu_option = "-G 1 "
+        else:
+            get_accuracy_metrics_gpu_option = ""
+
+        if cls.GET_HARDWARE_METRICS_USE_GPU:
+            get_hardware_metrics_gpu_option = "-G 1 "
+        else:
+            get_hardware_metrics_gpu_option = ""
+        job_names = []
+
+        # TODO: Handle case where HardwareMetrics should be calculated again
+
+        # TODO: Figure out how to handle the fact that Trial is expected
+        #  to be pickled somewhere.
+        for trial in pareto_set:
+            trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+            trial_pickle_path = (trial_dir /
+                                 f"pareto_set_trial_{trial.number}.pickle")
+            pickle.dump(trial, open(trial_pickle_path, "wb"))
+            job_names.append(f"job_{len(job_names)}")
+            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
+
+        # Wait for all jobs to complete
+        lines += [""]
+        for job_name in job_names:
+            lines += [f"ts -w ${job_name}"]
+
+        lines += ["",
+                  "echo 'Processing Pareto Set complete.'"]
+
+        file_path = target_dir / "process_pareto_set.sh"
+
+        with open(file_path, "w") as f:
+            f.writelines([line + "\n" for line in lines])
+
+        return file_path
+
+    @classmethod
+    def _create_run_outer_loop_sh(cls, target_dir: pathlib.Path,
+                                   run_outer_loop_iteration_paths: List[pathlib.Path]):
+        datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        lines = ["#!/bin/bash",
+                 "",
+                 "# NOTE: This script was automatically generated by",
+                 f"# {cls.__name__}._create_run_outer_loop_sh() on {datetime_str}",
+                 "",
+                 f"echo 'Run outer loop'",
+                 ""]
+
+        for p in run_outer_loop_iteration_paths:
+            lines += [f"bash {p.resolve()}"]
+
+        lines += ["",
+                  "echo 'Outer loop complete.'"]
+
+        file_path = target_dir / "run_outer_loop.sh"
+
+        with open(file_path, "w") as f:
             f.writelines([line + "\n" for line in lines])
 
         return file_path
@@ -1022,11 +1159,17 @@ class AbstractModelStudy(abc.ABC):
                                       callback=cls._cli_self_test,
                                       params=self_test_params)
 
-        # setup()
-        setup_params = []
-        setup_cmd = click.Command("setup",
-                                  callback=cls._cli_setup,
-                                  params=setup_params)
+        # setup_inner_loops()
+        setup_inner_loops_params = []
+        setup_inner_loops_cmd = click.Command("setup-inner-loops",
+                                  callback=cls._cli_setup_inner_loops,
+                                  params=setup_inner_loops_params)
+
+        # setup_outer_loop()
+        setup_outer_loop_params = []
+        setup_outer_loop_cmd = click.Command("setup-outer-loop",
+                                              callback=cls._cli_setup_outer_loop,
+                                              params=setup_outer_loop_params)
 
         # init_trial()
         init_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
@@ -1083,7 +1226,8 @@ class AbstractModelStudy(abc.ABC):
 
         # Group all commands
         group = click.Group(commands=[self_test_cmd,
-                                      setup_cmd,
+                                      setup_inner_loops_cmd,
+                                      setup_outer_loop_cmd,
                                       init_trial_cmd,
                                       get_hardware_metrics_cmd,
                                       get_accuracy_metrics_cmd,
@@ -1098,11 +1242,18 @@ class AbstractModelStudy(abc.ABC):
         cls.self_test()
 
     @classmethod
-    def _cli_setup(cls):
+    def _cli_setup_inner_loops(cls):
         """
-        Command-line entry point for the function setup().
+        Command-line entry point for the function setup_inner_loops().
         """
-        cls.setup()
+        cls.setup_inner_loops()
+
+    @classmethod
+    def _cli_setup_outer_loop(cls):
+        """
+        Command-line entry point for the function setup_outer_loop().
+        """
+        cls.setup_outer_loop()
 
     @classmethod
     def _cli_init_trial(cls, study_storage_url: str, study_name: str,

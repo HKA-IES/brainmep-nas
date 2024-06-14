@@ -56,31 +56,31 @@ class TestAbstractModelStudy:
             BadModelStudy.self_test()
 
     def test_setup_folder_already_exists(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
 
         with pytest.raises(FileExistsError):
-            GoodModelStudy.setup()
+            GoodModelStudy.setup_inner_loops()
 
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_setup_all_files_and_dirs_created(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         base_dir = GoodModelStudy.BASE_DIR
 
         assert os.path.isdir(base_dir)
         assert os.path.isfile(base_dir / "study_storage.db")
-        assert os.path.isfile(base_dir / "run_model_study.sh")
+        assert os.path.isfile(base_dir / "run_all_inner_loops.sh")
         for outer_fold in range(GoodModelStudy.N_FOLDS):
             outer_fold_dir = GoodModelStudy.BASE_DIR / f"outer_fold_{outer_fold}"
             assert os.path.isdir(outer_fold_dir)
             assert os.path.isfile(outer_fold_dir / "sampler.pickle")
             assert os.path.isfile(outer_fold_dir / "run_trial.sh")
-            assert os.path.isfile(outer_fold_dir / "run_study.sh")
+            assert os.path.isfile(outer_fold_dir / "run_inner_loop.sh")
 
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_init_trial(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -108,7 +108,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_accuracy_metrics_inner_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -134,7 +134,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_accuracy_metrics_inner_loop_all_folds(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -160,7 +160,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_accuracy_metrics_outer_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -186,7 +186,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_hardware_metrics_inner_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -212,7 +212,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_hardware_metrics_inner_loop_all_folds(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -238,7 +238,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_hardware_metrics_outer_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -264,7 +264,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_combined_metrics_inner_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -291,7 +291,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_combined_metrics_inner_loop_all_folds(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -318,7 +318,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_combined_metrics_outer_loop(self, mocker):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -345,7 +345,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_complete_trial_inner_loop(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -372,7 +372,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_complete_trial_inner_loop_metrics_missing(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -397,7 +397,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_complete_trial_outer_loop(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -421,7 +421,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_outer_fold(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -438,7 +438,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_trial_dir(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -457,7 +457,7 @@ class TestAbstractModelStudy:
         self.delete_model_study_directory(GoodModelStudy)
 
     def test_get_sampler_path(self):
-        GoodModelStudy.setup()
+        GoodModelStudy.setup_inner_loops()
         study_storage_url = f"sqlite:///{GoodModelStudy.BASE_DIR / "study_storage.db"}"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
@@ -477,7 +477,10 @@ class TestAbstractModelStudy:
     def test_cli(self):
         raise NotImplementedError
 
-    def test_cli_setup(self):
+    def test_cli_setup_inner_loops(self):
+        raise NotImplementedError
+
+    def test_cli_setup_outer_loop(self):
         raise NotImplementedError
 
     def test_cli_init_trial(self):
