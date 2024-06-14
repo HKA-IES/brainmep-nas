@@ -61,10 +61,9 @@ class AbstractModelStudy(abc.ABC):
     # Jobs queue
     N_PARALLEL_GPU_JOBS: int  # recommended: = number of GPUs
     N_PARALLEL_CPU_JOBS: int  # recommended: >= 1
-    GET_ACCURACY_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
     GET_ACCURACY_METRICS_USE_GPU: bool
-    GET_HARDWARE_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
     GET_HARDWARE_METRICS_USE_GPU: bool
+    GET_HARDWARE_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
 
     # ----------------------------------------------
     # - Abstract methods to be implemented by user -
@@ -108,17 +107,7 @@ class AbstractModelStudy(abc.ABC):
         If your implementation benefits from a GPU, set
         GET_ACCURACY_METRICS_USE_GPU=True.
 
-        This is called depending on the value of GET_ACCURACY_METRICS_CALL:
-            "once": called once, independently of inner_fold. If
-                    GET_HARDWARE_METRICS_CALL=="once", get_hardware_metrics() is
-                    called once after the execution of get_accuracy_metrics()
-                    is complete.
-            "per_inner_fold": called once per inner_fold. If
-                              GET_HARDWARE_METRICS_CALL=="per_inner_fold",
-                              get_hardware_metrics() is called for each fold
-                              after the execution of the corresponding
-                              get_accuracy_metrics() is complete.
-            "never": not called.
+        This is called once per inner fold.
 
         Note: to share information between get_accuracy_metrics() and
         get_hardware_metrics(), save information to file using pickle, csv,
@@ -250,7 +239,6 @@ class AbstractModelStudy(abc.ABC):
                                     "OBJ_2_METRIC", "OBJ_2_SCALING",
                                     "OBJ_2_DIRECTION", "N_PARALLEL_GPU_JOBS",
                                     "N_PARALLEL_CPU_JOBS",
-                                    "GET_ACCURACY_METRICS_CALL",
                                     "GET_ACCURACY_METRICS_USE_GPU",
                                     "GET_HARDWARE_METRICS_CALL",
                                     "GET_HARDWARE_METRICS_USE_GPU"]
@@ -733,14 +721,8 @@ class AbstractModelStudy(abc.ABC):
                 # For each inner fold, get CombinedMetrics from AccuracyMetrics
                 # and HardwareMetrics
                 for f in inner_folds:
-                    if cls.GET_ACCURACY_METRICS_CALL == "once":
-                        am_path = trial_dir / f"inner_fold_all_accuracy_metrics.pickle"
-                        am = pickle.load(open(am_path, "rb"))
-                    elif cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
-                        am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
-                        am = pickle.load(open(am_path, "rb"))
-                    else:
-                        am = None
+                    am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
+                    am = pickle.load(open(am_path, "rb"))
 
                     if cls.GET_HARDWARE_METRICS_CALL == "once":
                         hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
@@ -921,32 +903,20 @@ class AbstractModelStudy(abc.ABC):
         job_names = []
 
         # Call once
-        if cls.GET_ACCURACY_METRICS_CALL == "once":
-            job_names.append(f"job_{len(job_names)}")
-            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop)"]
-
         if cls.GET_HARDWARE_METRICS_CALL == "once":
             job_names.append(f"job_{len(job_names)}")
-            if cls.GET_ACCURACY_METRICS_CALL == "once":
-                # Wait for last get_accuracy_metrics job to complete.
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
-            else:
-                lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
+            lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
 
         # Call per_inner_fold
         inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
         for inner_fold in inner_folds:
-            if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
-                job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
+            job_names.append(f"job_{len(job_names)}")
+            lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
 
             if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                if cls.GET_ACCURACY_METRICS_CALL == "per_inner_fold":
-                    # Wait for last get_accuracy_metrics job to complete.
-                    lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
-                else:
-                    lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
+                # Wait for last get_accuracy_metrics job to complete.
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option} python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
 
         # Wait for all jobs to complete
         lines += [""]

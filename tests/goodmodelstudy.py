@@ -37,7 +37,6 @@ class GoodModelStudy(AbstractModelStudy):
     # Jobs queue
     N_PARALLEL_GPU_JOBS = 2
     N_PARALLEL_CPU_JOBS = 1
-    GET_ACCURACY_METRICS_CALL = "per_inner_fold"
     GET_ACCURACY_METRICS_USE_GPU = True
     GET_HARDWARE_METRICS_CALL = "once"
     GET_HARDWARE_METRICS_USE_GPU = False
