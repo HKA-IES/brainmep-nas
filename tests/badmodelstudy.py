@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
-from typing import Dict, Any
+from typing import Dict, Any, Literal, Optional
 import pathlib
 
 # import third-party modules
 import optuna
-import numpy as np
 
 # import your own module
 from brainmepnas import (AbstractModelStudy, HardwareMetrics, AccuracyMetrics,
@@ -24,12 +23,18 @@ class BadModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> AccuracyMetrics:
+                              trial_dir: pathlib.Path,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
+                              inner_fold: Optional[int] = None) -> AccuracyMetrics:
         raise NotImplementedError
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
-                              inner_fold: int) -> HardwareMetrics:
+                              trial_dir: pathlib.Path,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
+                              inner_fold: Optional[int] = None) -> HardwareMetrics:
         raise NotImplementedError
 
     @classmethod

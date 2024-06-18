@@ -49,6 +49,7 @@ class GoodModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
                               loop: Literal["inner", "outer"],
                               outer_fold: int,
                               inner_fold: Optional[int] = None) -> AccuracyMetrics:
@@ -75,6 +76,7 @@ class GoodModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
                               loop: Literal["inner", "outer"],
                               outer_fold: int,
                               inner_fold: Optional[int] = None) -> HardwareMetrics:

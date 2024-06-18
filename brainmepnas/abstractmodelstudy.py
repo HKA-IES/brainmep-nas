@@ -96,6 +96,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
                               loop: Literal["inner", "outer"],
                               outer_fold: int,
                               inner_fold: Optional[int] = None) -> AccuracyMetrics:
@@ -139,6 +140,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
                               loop: Literal["inner", "outer"],
                               outer_fold: int,
                               inner_fold: Optional[int] = None) -> HardwareMetrics:
@@ -253,6 +255,7 @@ class AbstractModelStudy(abc.ABC):
         trial = study.ask()
         tempdir = tempfile.TemporaryDirectory()
         trial.set_user_attr("trial_dir", tempdir.name)
+        trial_dir = pathlib.Path(tempdir.name)
 
         # _sample_search_space
         try:
@@ -263,7 +266,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_accuracy_metrics, inner loop
         try:
-            am = cls._get_accuracy_metrics(trial, "inner", 0, 1)
+            am = cls._get_accuracy_metrics(trial, trial_dir, "inner", 0, 1)
         except Exception as e:
             print(f"Exception in _get_accuracy_metrics() with loop='inner':")
             raise e
@@ -273,7 +276,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_accuracy_metrics, outer loop
         try:
-            am = cls._get_accuracy_metrics(trial, "outer", 0)
+            am = cls._get_accuracy_metrics(trial, trial_dir, "outer", 0)
         except Exception as e:
             print(
                 f"Exception in _get_accuracy_metrics() with loop='outer':")
@@ -284,7 +287,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_hardware_metrics, inner loop
         try:
-            hm = cls._get_hardware_metrics(trial, "inner", 0, 1)
+            hm = cls._get_hardware_metrics(trial, trial_dir, "inner", 0, 1)
         except Exception as e:
             print(f"Exception in _get_hardware_metrics() with loop='inner':")
             raise e
@@ -294,7 +297,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _get_hardware_metrics, outer loop
         try:
-            hm = cls._get_hardware_metrics(trial, "inner", 0)
+            hm = cls._get_hardware_metrics(trial, trial_dir, "inner", 0)
         except Exception as e:
             print(
                 f"Exception in _get_hardware_metrics() with loop='outer':")
@@ -549,7 +552,8 @@ class AbstractModelStudy(abc.ABC):
         tracker.start()
 
         # Call user implementation
-        am = cls._get_accuracy_metrics(trial, loop, outer_fold, inner_fold)
+        am = cls._get_accuracy_metrics(trial, trial_dir, loop, outer_fold,
+                                       inner_fold)
 
         # End carbon tracking
         tracker.stop()
@@ -637,7 +641,8 @@ class AbstractModelStudy(abc.ABC):
         tracker.start()
 
         # Call user implementation
-        hm = cls._get_hardware_metrics(trial, loop, outer_fold, inner_fold)
+        hm = cls._get_hardware_metrics(trial, trial_dir, loop, outer_fold,
+                                       inner_fold)
 
         # End carbon tracking
         tracker.stop()
@@ -813,7 +818,7 @@ class AbstractModelStudy(abc.ABC):
                 duration = time.time() - start_time
                 trial.set_user_attr(f"complete_trial_duration", duration)
                 study.tell(trial, state=optuna.trial.TrialState.FAIL)
-                sampler_path = cls.get_sampler_path(study)
+                sampler_path = pathlib.Path(study.user_attrs["sampler_path"])
                 pickle.dump(study.sampler, open(sampler_path, "wb"))
                 return None
 
@@ -837,7 +842,7 @@ class AbstractModelStudy(abc.ABC):
                 duration = time.time() - start_time
                 trial.set_user_attr(f"complete_trial_duration", duration)
                 study.tell(trial, state=optuna.trial.TrialState.FAIL)
-                sampler_path = cls.get_sampler_path(study)
+                sampler_path = pathlib.Path(study.user_attrs["sampler_path"])
                 pickle.dump(study.sampler, open(sampler_path, "wb"))
             else:
                 trial.set_user_attr(cls.OBJ_1_METRIC, obj_1_value)
@@ -845,7 +850,7 @@ class AbstractModelStudy(abc.ABC):
                 duration = time.time() - start_time
                 trial.set_user_attr(f"complete_trial_duration", duration)
                 study.tell(trial, [obj_1_value_scaled, obj_2_value_scaled])
-                sampler_path = cls.get_sampler_path(study)
+                sampler_path = pathlib.Path(study.user_attrs["sampler_path"])
                 pickle.dump(study.sampler, open(sampler_path, "wb"))
         elif loop == "outer":
             # Get CombinedMetrics from AccuracyMetrics and HardwareMetrics
@@ -882,58 +887,6 @@ class AbstractModelStudy(abc.ABC):
                 df.to_csv(csv_file_path, index=False, mode="a", header=False)
             else:
                 df.to_csv(csv_file_path, index=False, mode="w", header=True)
-
-
-    @classmethod
-    def get_outer_fold(cls, study: optuna.Study) -> int:
-        """
-        Read the current outer fold from a study.
-
-        Parameters
-        ----------
-        study: optuna.Study
-            Study object.
-
-        Returns
-        -------
-        outer_fold: int
-            Outer fold.
-        """
-        return int(study.user_attrs["outer_fold"])
-
-    @classmethod
-    def get_trial_dir(cls, trial: optuna.Trial) -> pathlib.Path:
-        """
-        Read the directory associated to the trial.
-
-        Parameters
-        ----------
-        trial: optuna.Trial
-            Trial object.
-
-        Returns
-        -------
-        trial_dir: pathlib.Path
-            Trial directory.
-        """
-        return pathlib.Path(trial.user_attrs["trial_dir"])
-
-    @classmethod
-    def get_sampler_path(cls, study: optuna.Study) -> pathlib.Path:
-        """
-        Read the sampler path from a study.
-
-        Parameters
-        ----------
-        study: optuna.Study
-            Study object.
-
-        Returns
-        -------
-        sampler_path: pathlib.Path
-            Path to pickled sampler.
-        """
-        return pathlib.Path(study.user_attrs["sampler_path"])
 
     def __init__(self):
         """
