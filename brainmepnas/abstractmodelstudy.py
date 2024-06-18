@@ -9,6 +9,7 @@ import tempfile
 from typing import Callable, Dict, List, Any, Literal, Optional
 import datetime
 import time
+import warnings
 
 # import third-party modules
 import optuna
@@ -411,6 +412,12 @@ class AbstractModelStudy(abc.ABC):
             study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
             study = optuna.load_study(storage=study_storage,
                                       study_name=study_name)
+            n_trials = len(study.trials)
+            if n_trials < cls.N_TRIALS:
+                warnings.warn(f"Study {study_name} has {n_trials}, which is "
+                              f"less that the expected "
+                              f"cls.N_TRIALS={cls.N_TRIALS}. Are you sure the "
+                              f"inner loop was fully completed?")
             study_dir = pathlib.Path(study.user_attrs["study_dir"])
             process_pareto_set_sh_path = (
                 cls._create_process_pareto_set_sh(study_dir,
@@ -455,6 +462,7 @@ class AbstractModelStudy(abc.ABC):
         study_dir = pathlib.Path(study.user_attrs["study_dir"])
         trial_dir = study_dir / f"trial_{new_trial.number}"
         new_trial.set_user_attr("trial_dir", str(trial_dir.resolve()))
+        new_trial.set_user_attr("outer_fold", str(study.user_attrs["outer_fold"]))
         os.mkdir(trial_dir)
 
         # Pickle trial
@@ -510,7 +518,7 @@ class AbstractModelStudy(abc.ABC):
         """
         start_time = time.time()
 
-        outer_fold = trial.study.user_attrs["outer_fold"]
+        outer_fold = int(trial.user_attrs["outer_fold"])
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
 
         # Verify parameters
@@ -598,7 +606,7 @@ class AbstractModelStudy(abc.ABC):
         """
         start_time = time.time()
 
-        outer_fold = trial.study.user_attrs["outer_fold"]
+        outer_fold = int(trial.user_attrs["outer_fold"])
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
 
         # Verify parameters
@@ -681,7 +689,7 @@ class AbstractModelStudy(abc.ABC):
         """
         start_time = time.time()
 
-        outer_fold = trial.study.user_attrs["outer_fold"]
+        outer_fold = trial.user_attrs["outer_fold"]
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
 
         # Verify parameters
@@ -750,9 +758,16 @@ class AbstractModelStudy(abc.ABC):
         """
         start_time = time.time()
 
-        study = trial.study
-        outer_fold = study.user_attrs["outer_fold"]
+        outer_fold = int(trial.user_attrs["outer_fold"])
         trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
+        try:
+            study = trial.study
+        except AttributeError:
+            # Manually load study
+            study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+            study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
+            study = optuna.load_study(storage=study_storage_url,
+                                      study_name=study_name)
 
         # Verify parameter
         if loop not in ["inner", "outer"]:
@@ -804,7 +819,12 @@ class AbstractModelStudy(abc.ABC):
 
             # Save all metrics to .csv file.
             df = pd.DataFrame.from_records(metrics_dicts)
-            df.to_csv(trial_dir / "metrics.csv")
+            # df.to_csv(trial_dir / "metrics.csv")
+            csv_file_path = cls.BASE_DIR / f"inner_loop_metrics.csv"
+            if csv_file_path.exists():
+                df.to_csv(csv_file_path, mode="a", header=False)
+            else:
+                df.to_csv(csv_file_path, mode="w", header=True)
 
             # Report objectives to trial.
             try:
@@ -832,18 +852,26 @@ class AbstractModelStudy(abc.ABC):
             # Get CombinedMetrics from AccuracyMetrics and HardwareMetrics
             am_path = trial_dir / f"outer_fold_{outer_fold}_accuracy_metrics.pickle"
             am = pickle.load(open(am_path, "rb"))
-            hm_path = trial_dir / f"outer_fold_{outer_fold}_hardware_metrics.pickle"
-            hm = pickle.load(open(hm_path, "rb"))
+            if cls.GET_HARDWARE_METRICS_CALL == "once":
+                hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
+                hm = pickle.load(open(hm_path, "rb"))
+            elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
+                hm_path = trial_dir / f"outer_fold_{outer_fold}_hardware_metrics.pickle"
+                hm = pickle.load(open(hm_path, "rb"))
             cm = cls.get_combined_metrics(am, hm, trial, loop)
-            d = {"outer_fold": outer_fold}
+            d = {"trial": trial.number,
+                 "outer_fold": outer_fold}
             d.update(am.as_dict())
             d.update(hm.as_dict())
             d.update(cm.as_dict())
 
             # Save all metrics to .csv file.
             df = pd.DataFrame.from_records([d])
-            df.to_csv(trial_dir / f"outer_fold_{outer_fold}_metrics.csv")
-
+            csv_file_path = cls.BASE_DIR / f"outer_loop_metrics.csv"
+            if csv_file_path.exists():
+                df.to_csv(csv_file_path, mode="a", header=False)
+            else:
+                df.to_csv(csv_file_path, mode="w", header=True)
 
 
     @classmethod
@@ -1084,6 +1112,8 @@ class AbstractModelStudy(abc.ABC):
             pickle.dump(trial, open(trial_pickle_path, "wb"))
             job_names.append(f"job_{len(job_names)}")
             lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
+            job_names.append(f"job_{len(job_names)}")
+            lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} python {cls.THIS_FILE} complete_trial -t {trial_pickle_path.resolve()} --outer-loop)"]
 
         # Wait for all jobs to complete
         lines += [""]
