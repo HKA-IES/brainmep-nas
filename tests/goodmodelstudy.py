@@ -24,7 +24,7 @@ class GoodModelStudy(AbstractModelStudy):
     BASE_DIR = pathlib.Path("dummy_model_study_1/")
     N_FOLDS = 3
     N_TRIALS = 5
-    THIS_FILE = __file__
+    THIS_FILE = pathlib.Path(__file__)
 
     # Objectives
     OBJ_1_METRIC = "sample_sensitivity"

@@ -16,7 +16,7 @@ class CPUModelStudy(BaseModelStudy):
     GET_HARDWARE_METRICS_USE_GPU = False
     NAME = "cpu_modelstudy"
     BASE_DIR = pathlib.Path("cpu_modelstudy/")
-    THIS_FILE = __file__
+    THIS_FILE = pathlib.Path(__file__)
 
 
 if __name__ == "__main__":

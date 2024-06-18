@@ -25,12 +25,134 @@ class AbstractModelStudy(abc.ABC):
     """
     Abstract implementation of a model study.
 
-    To use, inherit from this class and implement the following methods:
-        - [...]
+    To create a model study,
+        1) In a new .py file, create a class with inherits from this class.
+        2) Define all class attributes
+        3) Implement the following class methods:
+            - _sample_search_space
+            - _get_accuracy_metrics
+            - _get_hardware_metrics
+            - _get_combined_metrics
+        4) To enable command-line operation, add the following at the bottom of
+        the file:
+            ```
+            class MyModelStudy(AbstractModelStudy):
+                [...]
+
+
+            if __name__ == "__main__":
+                MyModelStudy.cli_entry_point()
+            ```
+
+    To run a model study, assuming the model study has the name
+    "my_model_study", the base directory "base_dir" and is defined in the file
+    mymodelstudy.py:
+        1) Test your class methods implementations
+            ```
+            python mymodelstudy.py self-test
+            ```
+        2) Setup the inner loops files
+            ```
+            python mymodelstudy.py setup-inner-loops
+            ```
+        3) Run all inner loops
+            ```
+            ./base_dir/run_all_inner_loops.sh
+            ```
+        3.1) Alternatively, you can run each inner loop individually
+            ```
+            ./base_dir/outer_fold_0/run_inner_loop.sh
+            ./base_dir/outer_fold_1/run_inner_loop.sh
+            ...
+            ```
+        4) (Optional) Monitor the progress of each study with optuna-dashboard
+            ```
+            optuna-dashboard sqlite:///base_dir/study_storage.db
+            ```
+        5) Setup the outer loop files based on the Pareto sets obtained from
+        the inner loops
+            ```
+            python mymodelstudy.py setup-outer-loop
+            ```
+        6) Fully-train the Pareto sets from the inner loops and test them on
+        unseen data
+            ```
+            ./base_dir/run_outer_loop.sh
+            ```
+        6.1) Alternatively, you can fully-train and test the Pareto sets from
+        each inner loop separately
+            ```
+            ./base_dir/outer_fold_0/process_pareto_set.sh
+            ./base_dir/outer_fold_1/process_pareto_set.sh
+            ...
+            ```
 
     Class attributes
     ----------------
-    [...]
+    NAME: str
+        Unique name for the model study.
+    SAMPLER: optuna.samplers.BaseSampler
+        Optuna sampler object (search algorithm).
+    BASE_DIR: pathlib.Path
+        Directory to store all model study files. This directory should not
+        exist beforehand, it will be created when the model study setups
+        itself.
+    N_FOLDS: int
+        Number of cross-validation folds. For F folds, F outer loops are
+        performed, each with (F-1) inner loops.
+    N_TRIALS: int
+        Number of different models to try in each inner loop.
+    THIS_FILE: pathlib.Path
+        Path to the implementation file. This should always be set to __file__:
+        ```
+        THIS_FILE = __file__
+        ```
+    OBJ_1_METRIC: str
+        Metric to use as the first objective. This should be an attribute of
+        AccuracyMetrics, HardwareMetrics, or CombinedMetrics.
+    OBJ_1_SCALING: Callable
+        Function to use to normalize the first objective. This does not have to
+        be a perfect normalization, it is however good to keep the objectives
+        roughly in the [0, 1] range.
+    OBJ_1_DIRECTION: str
+        Whether the first objective should be minimized or maximized.
+    OBJ_2_METRIC: str
+        Metric to use as the second objective. This should be an attribute of
+        AccuracyMetrics, HardwareMetrics, or CombinedMetrics.
+    OBJ_2_SCALING: Callable
+        Function to use to normalize the second objective. This does not have
+        to be a perfect normalization, it is however good to keep the
+        objectives roughly in the [0, 1] range.
+    OBJ_2_DIRECTION: str
+        Whether the second objective should be minimized or maximized.
+    N_PARALLEL_GPU_JOBS: int
+        Number of parallel GPU jobs to run. It is recommended to set it to the
+        number of available GPUs.
+    N_PARALLEL_CPU_JOBS: int
+        Number of parallel CPU jobs to run.
+        It is recommended to set it to >= 1.
+    GET_ACCURACY_METRICS_USE_GPU: bool
+        Whether get_accuracy_metrics should be called with a GPU.
+    GET_HARDWARE_METRICS_USE_GPU: bool
+        Whether get_hardware_metrics should be called with a GPU.
+    GET_HARDWARE_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
+        When to call the get_hardware_metrics method:
+            "never": The metrics used as objectives are not attributed of
+                     HardwareMetrics or CombinedMetrics, so there is no need to
+                     call get_hardware_metrics.
+            "once": The HardwareMetrics should be computed once per trial. Use
+                    this when the hardware metrics do not depend on the
+                    different training folds. For example, in the case of a
+                    neural network, the energy and latency do not depend on the
+                    weight values, rather only on the structure.
+            "per_inner_fold": The HardwareMetrics should be computed once per
+                              inner fold. Use this when the hardware metrics
+                              depend on the different training folds. For
+                              example, in the case of a random forest
+                              classifier, the depth and structure of each tree
+                              depends on the training data, which means that
+                              the energy and latency will also depend on the
+                              training data.
     """
     # TODO: Consider adding methods to run the whole studies in Python, with/
     #       without multiprocessing.
@@ -49,7 +171,7 @@ class AbstractModelStudy(abc.ABC):
     BASE_DIR: pathlib.Path
     N_FOLDS: int
     N_TRIALS: int
-    THIS_FILE: pathlib.Path # path to file of implementation
+    THIS_FILE: pathlib.Path
 
     # Objectives
     OBJ_1_METRIC: str
@@ -60,8 +182,8 @@ class AbstractModelStudy(abc.ABC):
     OBJ_2_DIRECTION: str
 
     # Jobs queue
-    N_PARALLEL_GPU_JOBS: int  # recommended: = number of GPUs
-    N_PARALLEL_CPU_JOBS: int  # recommended: >= 1
+    N_PARALLEL_GPU_JOBS: int
+    N_PARALLEL_CPU_JOBS: int
     GET_ACCURACY_METRICS_USE_GPU: bool
     GET_HARDWARE_METRICS_USE_GPU: bool
     GET_HARDWARE_METRICS_CALL: Literal["once", "per_inner_fold", "never"]
@@ -231,8 +353,6 @@ class AbstractModelStudy(abc.ABC):
 
         No exception is raised if a step of the test fails. All information is
         provided in warnings.
-
-        # TODO: Self-test every single fold?
         """
         # Check that all attributes are defined.
         # Adapted from https://stackoverflow.com/a/55544173
@@ -344,6 +464,11 @@ class AbstractModelStudy(abc.ABC):
         All data related to the model study are stored in BASE_DIR. All studies
         are placed in study_storage.db. Each study has a folder where scripts
         and execution traces are stored.
+
+        Raises
+        ------
+        FileExistsError
+            if the specified BASE_DIR already exists.
         """
 
         # Create base directory

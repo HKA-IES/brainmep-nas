@@ -4,12 +4,12 @@
 import os.path
 import shutil
 import pickle
-import pathlib
 from typing import Type
 
 # import third-party modules
 import pytest
 import optuna
+from click.testing import CliRunner
 
 # import your own module
 from brainmepnas import AbstractModelStudy
@@ -57,7 +57,7 @@ class TestAbstractModelStudy:
         with pytest.raises(Exception):
             BadModelStudy.self_test()
 
-    def test_setup_folder_already_exists(self):
+    def test_setup_inner_loops_folder_already_exists(self):
         GoodModelStudy.setup_inner_loops()
 
         with pytest.raises(FileExistsError):
@@ -65,7 +65,7 @@ class TestAbstractModelStudy:
 
         self.delete_model_study_directory(GoodModelStudy)
 
-    def test_setup_all_files_and_dirs_created(self):
+    def test_setup_inner_loops_all_files_and_dirs_created(self):
         GoodModelStudy.setup_inner_loops()
         base_dir = GoodModelStudy.BASE_DIR
 
@@ -78,6 +78,26 @@ class TestAbstractModelStudy:
             assert os.path.isfile(outer_fold_dir / "sampler.pickle")
             assert os.path.isfile(outer_fold_dir / "run_trial.sh")
             assert os.path.isfile(outer_fold_dir / "run_inner_loop.sh")
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_setup_outer_loop_files_already_exist(self):
+        GoodModelStudy.setup_inner_loops()
+        GoodModelStudy.setup_outer_loop()
+
+        # No exception is raised
+        GoodModelStudy.setup_outer_loop()
+
+        self.delete_model_study_directory(GoodModelStudy)
+
+    def test_setup_outer_loop_all_files_created(self):
+        GoodModelStudy.setup_inner_loops()
+        GoodModelStudy.setup_outer_loop()
+        base_dir = GoodModelStudy.BASE_DIR
+
+        assert os.path.isfile(base_dir / "run_outer_loop.sh")
+        for outer_fold in range(GoodModelStudy.N_FOLDS):
+            assert os.path.isfile(base_dir / f"outer_fold_{outer_fold}" / "process_pareto_set.sh")
 
         self.delete_model_study_directory(GoodModelStudy)
 
@@ -421,24 +441,3 @@ class TestAbstractModelStudy:
         study_storage.scoped_session.get_bind().dispose()
 
         self.delete_model_study_directory(GoodModelStudy)
-
-    def test_cli(self):
-        raise NotImplementedError
-
-    def test_cli_setup_inner_loops(self):
-        raise NotImplementedError
-
-    def test_cli_setup_outer_loop(self):
-        raise NotImplementedError
-
-    def test_cli_init_trial(self):
-        raise NotImplementedError
-
-    def test_cli_get_hardware_metrics(self):
-        raise NotImplementedError
-
-    def test_cli_get_accuracy_metrics(self):
-        raise NotImplementedError
-
-    def test_cli_complete_trial(self):
-        raise NotImplementedError
