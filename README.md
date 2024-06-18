@@ -7,6 +7,12 @@ Brain-MEP Project.
 
 **Note: this package is a work in progress**
 
+## Requirements
+- Linux distribution
+  - If you are under Windows, consider using [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/install) (WSL)
+- [task-spooler](https://github.com/justanhduc/task-spooler)
+- [SQLite 3](https://sqlite.org/)
+
 ## Install it from the repository
 Tested with Python 3.12.
 
