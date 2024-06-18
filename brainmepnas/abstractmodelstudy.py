@@ -821,9 +821,9 @@ class AbstractModelStudy(abc.ABC):
             df = pd.DataFrame.from_records(metrics_dicts)
             csv_file_path = cls.BASE_DIR / f"outer_fold_{outer_fold}" / f"inner_loop_metrics.csv"
             if csv_file_path.exists():
-                df.to_csv(csv_file_path, mode="a", header=False)
+                df.to_csv(csv_file_path, index=False, mode="a", header=False)
             else:
-                df.to_csv(csv_file_path, mode="w", header=True)
+                df.to_csv(csv_file_path, index=False, mode="w", header=True)
 
             # Report objectives to trial.
             try:
@@ -879,9 +879,9 @@ class AbstractModelStudy(abc.ABC):
             df = pd.DataFrame.from_records([d])
             csv_file_path = cls.BASE_DIR / f"outer_loop_metrics.csv"
             if csv_file_path.exists():
-                df.to_csv(csv_file_path, mode="a", header=False)
+                df.to_csv(csv_file_path, index=False, mode="a", header=False)
             else:
-                df.to_csv(csv_file_path, mode="w", header=True)
+                df.to_csv(csv_file_path, index=False, mode="w", header=True)
 
 
     @classmethod
