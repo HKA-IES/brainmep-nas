@@ -322,16 +322,13 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def setup_inner_loops(cls):
         """
-        Setup a model study.
+        Setup the inner loops for a model study.
 
         A model study consists of an outer and an inner loop. The inner loop
         is represented by an Optuna Study object and contains many trials. The
         output of a single inner loop is a Pareto Set, which has been trained
         and tested on a subset of the data for inner loop 1. The outer loop
-        consists in evaluating the generalization capability of the Pareto Set
-        yielded by the inner loop. In the outer loop, the Pareto Sets obtained
-        from each inner loop are re-trained and then tested with previously
-        unseen data.
+        consists in evaluating the different Pareto sets on unseen data.
 
         Example:
             - Desired number of folds is 5, which means that the dataset is
@@ -343,8 +340,6 @@ class AbstractModelStudy(abc.ABC):
             performed on the 4 folds: 4 models are trained, each with leaving
             out one of the folds for testing. The trial performance is the
             mean performance of all trials.
-
-        # TODO: Complete this documentation
 
         All data related to the model study are stored in BASE_DIR. All studies
         are placed in study_storage.db. Each study has a folder where scripts
@@ -398,14 +393,17 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def setup_outer_loop(cls):
         """
-        Setup the outer loop of a model study.
+        Setup the outer loop for a model study.
 
-        The outer loop consists in fully training and testing the best trials
-        obtained for each inner loop.
+        A model study consists of an outer and an inner loop. The inner loop
+        is represented by an Optuna Study object and contains many trials. The
+        output of a single inner loop is a Pareto Set, which has been trained
+        and tested on a subset of the data for inner loop 1. The outer loop
+        consists in evaluating the different Pareto sets on unseen data.
 
-        Bash scripts are created ...
-
-        # TODO: Complete
+        All data related to the model study are stored in BASE_DIR. All studies
+        are placed in study_storage.db. Each study has a folder where scripts
+        and execution traces are stored.
         """
         study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
         study_storage = optuna.storages.RDBStorage(study_storage_url)
@@ -1064,8 +1062,6 @@ class AbstractModelStudy(abc.ABC):
             get_hardware_metrics_gpu_option = ""
         job_names = []
 
-        # TODO: Handle case where HardwareMetrics should be calculated again
-
         for trial in pareto_set:
             trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
             trial_pickle_path = (trial_dir /
@@ -1075,7 +1071,7 @@ class AbstractModelStudy(abc.ABC):
             lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
             if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 job_names.append(f"job_{len(job_names)}")
-                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} python {cls.THIS_FILE} get_hardware_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
             job_names.append(f"job_{len(job_names)}")
             lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} python {cls.THIS_FILE} complete_trial -t {trial_pickle_path.resolve()} --outer-loop)"]
 
