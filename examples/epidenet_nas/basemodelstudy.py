@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 import pathlib
 
 # import third-party modules
@@ -46,7 +46,6 @@ class BaseModelStudy(AbstractModelStudy):
     SAMPLER = optuna.samplers.TPESampler(seed=42)
     N_FOLDS = 5     # Patient 5 has 5 records with a seizure.
     N_TRIALS = 5    # Small to ensure example runs relatively fast.
-    GET_ACCURACY_METRICS_CALL = "per_inner_fold"
     GET_HARDWARE_METRICS_CALL = "once"
     OBJ_1_METRIC = "sample_sensitivity"
     OBJ_1_SCALING = lambda x: x
@@ -146,6 +145,9 @@ class BaseModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_accuracy_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
                               inner_fold: Optional[int] = None) -> AccuracyMetrics:
         # Import done in the function to avoid the tf import overhead when
         # it is not needed.
@@ -161,18 +163,24 @@ class BaseModelStudy(AbstractModelStudy):
         # tf.config.experimental.enable_op_determinism()
 
         # Get test and train data
-        outer_fold = cls.get_outer_fold(trial.study)
-
         patient_5_records = [i for i in range(5)]
-        patient_5_records.pop(outer_fold)
 
-        test_seizures = [patient_5_records[inner_fold]]
-        patient_5_records.pop(inner_fold)
-        train_seizures = patient_5_records
+        if loop == "inner":
+            test_seizures = [patient_5_records[inner_fold]]
+            train_seizures = [rec for idx, rec in enumerate(patient_5_records)
+                              if idx != inner_fold and idx != outer_fold]
+        elif loop == "outer":
+            test_seizures = [patient_5_records[outer_fold]]
+            train_seizures = [rec for idx, rec in enumerate(patient_5_records)
+                              if idx != outer_fold]
+
         dataset = Dataset(cls.DATASET_DIR)
 
+        # Sample model from trial
         params = cls._sample_search_space(trial)
-        model = cls.get_model(params)# Compile
+        model = cls.get_model(params)
+
+        # Compile
         optimizer = keras.optimizers.Adam(learning_rate=1 * 10 ** (-4),
                                              beta_1=0.9, beta_2=0.999)
         loss_fn = keras.losses.BinaryCrossentropy()
@@ -184,8 +192,14 @@ class BaseModelStudy(AbstractModelStudy):
                       weighted_metrics=metrics)
 
         # Train model
+        if loop == "inner":
+            patience = 5
+            max_epochs = 5
+        elif loop == "outer":
+            patience = 10
+            max_epochs = 10
         callbacks = [keras.callbacks.EarlyStopping(monitor="val_loss",
-                                                      patience=5,
+                                                      patience=patience,
                                                       mode="min",
                                                       start_from_epoch=10)]
 
@@ -196,7 +210,7 @@ class BaseModelStudy(AbstractModelStudy):
         model.fit(train_data[0], train_data[1],
                             callbacks=callbacks,
                             batch_size=256, validation_split=0.2,
-                            epochs=5, shuffle=False)
+                            epochs=max_epochs, shuffle=False)
 
         del train_data
 
@@ -211,6 +225,9 @@ class BaseModelStudy(AbstractModelStudy):
 
     @classmethod
     def _get_hardware_metrics(cls, trial: optuna.Trial,
+                              trial_dir: pathlib.Path,
+                              loop: Literal["inner", "outer"],
+                              outer_fold: int,
                               inner_fold: Optional[int] = None) -> HardwareMetrics:
         from brainmepnas.mltkhardwaremetrics import MltkHardwareMetrics
         from brainmepnas.tf_utils import generate_tflite_model
@@ -219,7 +236,6 @@ class BaseModelStudy(AbstractModelStudy):
         model = cls.get_model(params)
         tflite_model = generate_tflite_model(model, "float", "float")
 
-        trial_dir = cls.get_trial_dir(trial)
         tflite_model_path = trial_dir / "quantized_model.tflite"
 
         with open(tflite_model_path, "wb") as file:

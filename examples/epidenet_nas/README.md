@@ -16,7 +16,7 @@ First, set DATASET_DIR in basemodelstudy.py to the directory containing the
 pre-processed CHB-MIT data (see examples/pre_process_chb_mit/)
 
 ### GPU
-
+Not yet tested.
 ```
 python gpu_modelstudy.py self-test
 python gpu_modelstudy.py setup
@@ -28,9 +28,11 @@ optuna-dashboard sqlite:///gpu_modelstudy/study_storage.db
 
 ```
 python cpu_modelstudy.py self-test
-python cpu_modelstudy.py setup
-./cpu_modelstudy/run_model_study.sh
+python cpu_modelstudy.py setup-inner-loops
+./cpu_modelstudy/run_all_inner_loops.sh
 optuna-dashboard sqlite:///cpu_modelstudy/study_storage.db
+python cpu_modelstudy.py setup-outer-loop
+./cpu_modelstudy/run_outer_loop.sh
 ```
 
 ## Detailed description
