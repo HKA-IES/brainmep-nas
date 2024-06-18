@@ -774,7 +774,6 @@ class AbstractModelStudy(abc.ABC):
             raise ValueError("loop must be either 'inner' or 'outer'.")
 
         if loop == "inner":
-            # TODO: Ensure that there is no overlap between inner_folds and outer_fold.
             inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
 
             metrics_dicts = []
@@ -800,7 +799,8 @@ class AbstractModelStudy(abc.ABC):
                     else:
                         cm = None
 
-                    d = {"inner_fold": f}
+                    d = {"trial": trial.number,
+                         "inner_fold": f}
                     if am is not None:
                         d.update(am.as_dict())
                     if hm is not None:
@@ -819,8 +819,7 @@ class AbstractModelStudy(abc.ABC):
 
             # Save all metrics to .csv file.
             df = pd.DataFrame.from_records(metrics_dicts)
-            # df.to_csv(trial_dir / "metrics.csv")
-            csv_file_path = cls.BASE_DIR / f"inner_loop_metrics.csv"
+            csv_file_path = cls.BASE_DIR / f"outer_fold_{outer_fold}" / f"inner_loop_metrics.csv"
             if csv_file_path.exists():
                 df.to_csv(csv_file_path, mode="a", header=False)
             else:
@@ -858,9 +857,20 @@ class AbstractModelStudy(abc.ABC):
             elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
                 hm_path = trial_dir / f"outer_fold_{outer_fold}_hardware_metrics.pickle"
                 hm = pickle.load(open(hm_path, "rb"))
-            cm = cls.get_combined_metrics(am, hm, trial, loop)
+            else:
+                hm = None
+            if am is not None and hm is not None:
+                cm = cls.get_combined_metrics(am, hm, trial, "outer")
+            else:
+                cm = None
             d = {"trial": trial.number,
                  "outer_fold": outer_fold}
+            if am is not None:
+                d.update(am.as_dict())
+            if hm is not None:
+                d.update(hm.as_dict())
+            if cm is not None:
+                d.update(cm.as_dict())
             d.update(am.as_dict())
             d.update(hm.as_dict())
             d.update(cm.as_dict())
@@ -1103,8 +1113,6 @@ class AbstractModelStudy(abc.ABC):
 
         # TODO: Handle case where HardwareMetrics should be calculated again
 
-        # TODO: Figure out how to handle the fact that Trial is expected
-        #  to be pickled somewhere.
         for trial in pareto_set:
             trial_dir = pathlib.Path(trial.user_attrs["trial_dir"])
             trial_pickle_path = (trial_dir /
@@ -1112,6 +1120,9 @@ class AbstractModelStudy(abc.ABC):
             pickle.dump(trial, open(trial_pickle_path, "wb"))
             job_names.append(f"job_{len(job_names)}")
             lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
+            if cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
+                job_names.append(f"job_{len(job_names)}")
+                lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} python {cls.THIS_FILE} get_hardware_metrics -t {trial_pickle_path.resolve()} --outer-loop)"]
             job_names.append(f"job_{len(job_names)}")
             lines += [f"{job_names[-1]}=$(ts -D ${job_names[-2]} python {cls.THIS_FILE} complete_trial -t {trial_pickle_path.resolve()} --outer-loop)"]
 
