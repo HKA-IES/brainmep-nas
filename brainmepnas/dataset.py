@@ -24,7 +24,8 @@ class Dataset:
 
     To load a dataset: dataset = Dataset(directory)
     To create a dataset: create_new_dataset(directory, ...)
-    To add a record to an existing dataset: add_record_to_dataset(directory, ...)
+    To add a record to an existing dataset:
+        add_record_to_dataset(directory, ...)
 
     Dataset creation and modification is separated from the Dataset class
     because modifying a data set should be done in different contexts than
@@ -88,7 +89,8 @@ class Dataset:
             Examples:
                 Selecting all records from all patients
                     patients_records = "all"
-                Selecting all records from patient "1" and records 0, 1 from patient "2"
+                Selecting all records from patient "1" and records 0, 1 from
+                patient "2"
                     patients_records = {"1": "all",
                                         "2": [0, 1]}
         set: Literal["train", "test"]
