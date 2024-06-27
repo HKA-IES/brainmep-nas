@@ -10,8 +10,7 @@ import numpy as np
 
 # import your own module
 from brainmepnas import (AbstractModelStudy, HardwareMetrics, AccuracyMetrics,
-                            CombinedMetrics)
-from brainmepnas.dataset import Dataset
+                            CombinedMetrics, Dataset)
 
 
 class BaseModelStudy(AbstractModelStudy):
@@ -96,32 +95,32 @@ class BaseModelStudy(AbstractModelStudy):
 
         # Block 1
         model.add(keras.layers.Conv2D(filters=params["conv_1_filters"],
-                                         kernel_size=(4, 1),
-                                         padding="same"))
+                                      kernel_size=(4, 1),
+                                      padding="same"))
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Activation("relu"))
         model.add(keras.layers.MaxPooling2D(pool_size=(8, 1)))
 
         # Block 2
         model.add(keras.layers.Conv2D(filters=params["conv_2_filters"],
-                                         kernel_size=(16, 1),
-                                         padding="same"))
+                                      kernel_size=(16, 1),
+                                      padding="same"))
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Activation("relu"))
         model.add(keras.layers.MaxPooling2D(pool_size=(4, 1)))
 
         # Block 3
         model.add(keras.layers.Conv2D(filters=params["conv_3_filters"],
-                                         kernel_size=(8, 1),
-                                         padding="same"))
+                                      kernel_size=(8, 1),
+                                      padding="same"))
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Activation("relu"))
         model.add(keras.layers.MaxPooling2D(pool_size=(4, 1)))
 
         # Block 4
         model.add(keras.layers.Conv2D(filters=params["conv_4_filters"],
-                                         kernel_size=(1, 16),
-                                         padding="same"))
+                                      kernel_size=(1, 16),
+                                      padding="same"))
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Activation("relu"))
         model.add(keras.layers.MaxPooling2D(pool_size=(1, 4)))
@@ -129,11 +128,12 @@ class BaseModelStudy(AbstractModelStudy):
         # Block 5
 
         model.add(keras.layers.Conv2D(filters=params["conv_5_filters"],
-                                         kernel_size=(1, 8),
-                                         padding="same"))
+                                      kernel_size=(1, 8),
+                                      padding="same"))
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Activation("relu"))
-        pool_5_pool_size = (model.layers[-1].output.shape[1], model.layers[-1].output.shape[2])
+        pool_5_pool_size = (model.layers[-1].output.shape[1],
+                            model.layers[-1].output.shape[2])
         model.add(keras.layers.AveragePooling2D(pool_size=pool_5_pool_size))
 
         # Output
@@ -157,9 +157,10 @@ class BaseModelStudy(AbstractModelStudy):
         # (if the model would be the same)
         keras.utils.set_random_seed(42)
 
-        # Fully deterministic results can be achieved with the following method,
-        # at the cost of longer training time. Since the NAS process is already an
-        # approximation, and is meant to be fast, we leave it commented.
+        # Fully deterministic results can be achieved with the following
+        # method, at the cost of longer training time. Since the NAS process
+        # is already an approximation, and is meant to be fast, we leave it
+        # commented.
         # tf.config.experimental.enable_op_determinism()
 
         # Get test and train data
@@ -169,7 +170,7 @@ class BaseModelStudy(AbstractModelStudy):
             test_seizures = [patient_5_records[inner_fold]]
             train_seizures = [rec for idx, rec in enumerate(patient_5_records)
                               if idx != inner_fold and idx != outer_fold]
-        elif loop == "outer":
+        else:
             test_seizures = [patient_5_records[outer_fold]]
             train_seizures = [rec for idx, rec in enumerate(patient_5_records)
                               if idx != outer_fold]
@@ -182,11 +183,11 @@ class BaseModelStudy(AbstractModelStudy):
 
         # Compile
         optimizer = keras.optimizers.Adam(learning_rate=1 * 10 ** (-4),
-                                             beta_1=0.9, beta_2=0.999)
+                                          beta_1=0.9, beta_2=0.999)
         loss_fn = keras.losses.BinaryCrossentropy()
         metrics = [keras.metrics.AUC(num_thresholds=200,
-                                        curve='ROC',
-                                        name="auc_roc")]
+                                     curve='ROC',
+                                     name="auc_roc")]
         model.compile(optimizer=optimizer,
                       loss=loss_fn,
                       weighted_metrics=metrics)
@@ -195,31 +196,32 @@ class BaseModelStudy(AbstractModelStudy):
         if loop == "inner":
             patience = 5
             max_epochs = 5
-        elif loop == "outer":
+        else:
             patience = 10
             max_epochs = 10
         callbacks = [keras.callbacks.EarlyStopping(monitor="val_loss",
-                                                      patience=patience,
-                                                      mode="min",
-                                                      start_from_epoch=10)]
+                                                   patience=patience,
+                                                   mode="min",
+                                                   start_from_epoch=10)]
 
         train_data = dataset.get_data({"5": train_seizures},
                                       "train",
                                       shuffle=True, shuffle_seed=42)
 
         model.fit(train_data[0], train_data[1],
-                            callbacks=callbacks,
-                            batch_size=256, validation_split=0.2,
-                            epochs=max_epochs, shuffle=False)
+                  callbacks=callbacks,
+                  batch_size=256, validation_split=0.2,
+                  epochs=max_epochs, shuffle=False)
 
         del train_data
 
         # Test model
         test_data = dataset.get_data({"5": test_seizures},
-                                      "test", shuffle=False)
+                                     "test", shuffle=False)
         test_y_predicted = model.predict(test_data[0])
-        am = AccuracyMetrics(test_data[1].flatten(), test_y_predicted.flatten(),
-                                           4, 2, threshold="max_f_score")
+        am = AccuracyMetrics(test_data[1].flatten(),
+                             test_y_predicted.flatten(),
+                             4, 2, threshold="max_f_score")
 
         return am
 

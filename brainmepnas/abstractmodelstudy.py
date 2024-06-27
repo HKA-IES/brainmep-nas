@@ -51,7 +51,7 @@ class AbstractModelStudy(abc.ABC):
             ```
             python mymodelstudy.py self-test
             ```
-        2) Setup the inner loops files
+        2) Set up the inner loops files
             ```
             python mymodelstudy.py setup-inner-loops
             ```
@@ -69,7 +69,7 @@ class AbstractModelStudy(abc.ABC):
             ```
             optuna-dashboard sqlite:///base_dir/study_storage.db
             ```
-        5) Setup the outer loop files based on the Pareto sets obtained from
+        5) Set up the outer loop files based on the Pareto sets obtained from
         the inner loops
             ```
             python mymodelstudy.py setup-outer-loop
@@ -367,7 +367,8 @@ class AbstractModelStudy(abc.ABC):
                                     "GET_HARDWARE_METRICS_USE_GPU"]
         for var in required_class_variables:
             if not hasattr(cls, var):
-                raise NotImplementedError(f"Class attribute '{var}' is missing.")
+                raise NotImplementedError(f"Class attribute '{var}' is "
+                                          f"missing.")
 
         # Create dummy study and dummy trial
         study = optuna.create_study()
@@ -379,7 +380,7 @@ class AbstractModelStudy(abc.ABC):
 
         # _sample_search_space
         try:
-            params = cls._sample_search_space(trial)
+            _ = cls._sample_search_space(trial)
         except Exception as e:
             print(f"Exception in _sample_search_space():")
             raise e
@@ -392,7 +393,8 @@ class AbstractModelStudy(abc.ABC):
             raise e
         else:
             if not isinstance(am, AccuracyMetrics):
-                raise TypeError(f"_get_accuracy_metrics() with loop='inner' returned unexpected type: {type(am)}")
+                raise TypeError(f"_get_accuracy_metrics() with loop='inner' "
+                                f"returned unexpected type: {type(am)}")
 
         # _get_accuracy_metrics, outer loop
         try:
@@ -403,7 +405,8 @@ class AbstractModelStudy(abc.ABC):
             raise e
         else:
             if not isinstance(am, AccuracyMetrics):
-                raise TypeError(f"_get_accuracy_metrics() with loop='outer' returned unexpected type: {type(am)}")
+                raise TypeError(f"_get_accuracy_metrics() with loop='outer' "
+                                f"returned unexpected type: {type(am)}")
 
         # _get_hardware_metrics, inner loop
         try:
@@ -413,7 +416,8 @@ class AbstractModelStudy(abc.ABC):
             raise e
         else:
             if not isinstance(hm, HardwareMetrics):
-                raise TypeError(f"_get_hardware_metrics() with loop='inner' returned unexpected type: {type(hm)}")
+                raise TypeError(f"_get_hardware_metrics() with loop='inner' "
+                                f"returned unexpected type: {type(hm)}")
 
         # _get_hardware_metrics, outer loop
         try:
@@ -425,7 +429,8 @@ class AbstractModelStudy(abc.ABC):
         else:
             if not isinstance(hm, HardwareMetrics):
                 raise TypeError(
-                    f"_get_hardware_metrics() with loop='outer' returned unexpected type: {type(hm)}")
+                    f"_get_hardware_metrics() with loop='outer' returned "
+                    f"unexpected type: {type(hm)}")
 
         # _get_combined_metrics
         try:
@@ -435,14 +440,15 @@ class AbstractModelStudy(abc.ABC):
             raise e
         else:
             if not isinstance(cm, CombinedMetrics):
-                raise TypeError(f"_get_combined_metrics() returned unexpected type: {type(cm)}")
+                raise TypeError(f"_get_combined_metrics() returned unexpected "
+                                f"type: {type(cm)}")
 
         tempdir.cleanup()
 
     @classmethod
     def setup_inner_loops(cls):
         """
-        Setup the inner loops for a model study.
+        Set up the inner loops for a model study.
 
         A model study consists of an outer and an inner loop. The inner loop
         is represented by an Optuna Study object and contains many trials. The
@@ -505,9 +511,13 @@ class AbstractModelStudy(abc.ABC):
             study.set_user_attr("study_dir", str(outer_fold_dir.resolve()))
             study.set_user_attr("sampler_path", str(sampler_path.resolve()))
 
-            run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir, study_storage_url, study_name,
-                                     sampler_path, outer_fold)
-            run_inner_loop_sh_path = cls._create_run_inner_loop_sh(outer_fold_dir, run_trial_sh_path)
+            run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir,
+                                                         study_storage_url,
+                                                         study_name,
+                                                         sampler_path,
+                                                         outer_fold)
+            run_inner_loop_sh_path = cls._create_run_inner_loop_sh(outer_fold_dir,
+                                                                   run_trial_sh_path)
             run_inner_loop_files.append(run_inner_loop_sh_path)
         cls._create_run_all_inner_loops_sh(cls.BASE_DIR, run_inner_loop_files)
 
@@ -518,7 +528,7 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def setup_outer_loop(cls):
         """
-        Setup the outer loop for a model study.
+        Set up the outer loop for a model study.
 
         A model study consists of an outer and an inner loop. The inner loop
         is represented by an Optuna Study object and contains many trials. The
@@ -530,7 +540,8 @@ class AbstractModelStudy(abc.ABC):
         are placed in study_storage.db. Each study has a folder where scripts
         and execution traces are stored.
         """
-        study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+        study_storage_url = (f"sqlite:///{cls.BASE_DIR.resolve()}/"
+                             f"study_storage.db")
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
         run_outer_loop_iteration_files = []
@@ -588,7 +599,8 @@ class AbstractModelStudy(abc.ABC):
         study_dir = pathlib.Path(study.user_attrs["study_dir"])
         trial_dir = study_dir / f"trial_{new_trial.number}"
         new_trial.set_user_attr("trial_dir", str(trial_dir.resolve()))
-        new_trial.set_user_attr("outer_fold", str(study.user_attrs["outer_fold"]))
+        new_trial.set_user_attr("outer_fold",
+                                str(study.user_attrs["outer_fold"]))
         os.mkdir(trial_dir)
 
         # Pickle trial
@@ -614,9 +626,9 @@ class AbstractModelStudy(abc.ABC):
 
         This is called depending on the value of GET_ACCURACY_METRICS_CALL:
             "once": called once, independently of inner_fold. If
-                    GET_HARDWARE_METRICS_CALL=="once", get_hardware_metrics() is
-                    called once after the execution of get_accuracy_metrics()
-                    is complete.
+                    GET_HARDWARE_METRICS_CALL=="once", get_hardware_metrics()
+                    is called once after the execution of
+                    get_accuracy_metrics() is complete.
             "per_inner_fold": called once per inner_fold. If
                               GET_HARDWARE_METRICS_CALL=="per_inner_fold",
                               get_hardware_metrics() is called for each fold
@@ -663,7 +675,7 @@ class AbstractModelStudy(abc.ABC):
                 description = f"inner_fold_all_accuracy_metrics"
             else:
                 description = f"inner_fold_{inner_fold}_accuracy_metrics"
-        elif loop == "outer":
+        else:
             description = f"outer_fold_{outer_fold}_accuracy_metrics"
 
         # Start carbon tracking
@@ -752,7 +764,7 @@ class AbstractModelStudy(abc.ABC):
                 description = f"inner_fold_all_hardware_metrics"
             else:
                 description = f"inner_fold_{inner_fold}_hardware_metrics"
-        elif loop == "outer":
+        else:
             description = f"outer_fold_{outer_fold}_hardware_metrics"
 
         # Start carbon tracking
@@ -836,7 +848,7 @@ class AbstractModelStudy(abc.ABC):
                 description = f"inner_fold_all_combined_metrics"
             else:
                 description = f"inner_fold_{inner_fold}_combined_metrics"
-        elif loop == "outer":
+        else:
             description = f"outer_fold_{outer_fold}_combined_metrics"
 
         # Start carbon tracking
@@ -892,7 +904,8 @@ class AbstractModelStudy(abc.ABC):
             study = trial.study
         except AttributeError:
             # Manually load study
-            study_storage_url = f"sqlite:///{cls.BASE_DIR.resolve()}/study_storage.db"
+            study_storage_url = (f"sqlite:///{cls.BASE_DIR.resolve()}/"
+                                 f"study_storage.db")
             study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
             study = optuna.load_study(storage=study_storage_url,
                                       study_name=study_name)
@@ -910,14 +923,17 @@ class AbstractModelStudy(abc.ABC):
                 # For each inner fold, get CombinedMetrics from AccuracyMetrics
                 # and HardwareMetrics
                 for f in inner_folds:
-                    am_path = trial_dir / f"inner_fold_{f}_accuracy_metrics.pickle"
+                    am_path = (trial_dir /
+                               f"inner_fold_{f}_accuracy_metrics.pickle")
                     am = pickle.load(open(am_path, "rb"))
 
                     if cls.GET_HARDWARE_METRICS_CALL == "once":
-                        hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
+                        hm_path = (trial_dir /
+                                   f"inner_fold_all_hardware_metrics.pickle")
                         hm = pickle.load(open(hm_path, "rb"))
                     elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
-                        hm_path = trial_dir / f"inner_fold_{f}_hardware_metrics.pickle"
+                        hm_path = (trial_dir /
+                                   f"inner_fold_{f}_hardware_metrics.pickle")
                         hm = pickle.load(open(hm_path, "rb"))
                     else:
                         hm = None
@@ -947,7 +963,8 @@ class AbstractModelStudy(abc.ABC):
 
             # Save all metrics to .csv file.
             df = pd.DataFrame.from_records(metrics_dicts)
-            csv_file_path = cls.BASE_DIR / f"outer_fold_{outer_fold}" / f"inner_loop_metrics.csv"
+            csv_file_path = (cls.BASE_DIR / f"outer_fold_{outer_fold}" /
+                             f"inner_loop_metrics.csv")
             if csv_file_path.exists():
                 df.to_csv(csv_file_path, index=False, mode="a", header=False)
             else:
@@ -977,13 +994,15 @@ class AbstractModelStudy(abc.ABC):
                 pickle.dump(study.sampler, open(sampler_path, "wb"))
         elif loop == "outer":
             # Get CombinedMetrics from AccuracyMetrics and HardwareMetrics
-            am_path = trial_dir / f"outer_fold_{outer_fold}_accuracy_metrics.pickle"
+            am_path = (trial_dir /
+                       f"outer_fold_{outer_fold}_accuracy_metrics.pickle")
             am = pickle.load(open(am_path, "rb"))
             if cls.GET_HARDWARE_METRICS_CALL == "once":
                 hm_path = trial_dir / f"inner_fold_all_hardware_metrics.pickle"
                 hm = pickle.load(open(hm_path, "rb"))
             elif cls.GET_HARDWARE_METRICS_CALL == "per_inner_fold":
-                hm_path = trial_dir / f"outer_fold_{outer_fold}_hardware_metrics.pickle"
+                hm_path = (trial_dir /
+                           f"outer_fold_{outer_fold}_hardware_metrics.pickle")
                 hm = pickle.load(open(hm_path, "rb"))
             else:
                 hm = None
@@ -1013,7 +1032,7 @@ class AbstractModelStudy(abc.ABC):
 
     def __init__(self):
         """
-        This class is not meant to be instanciated. All methods and attributes
+        This class is not meant to be instantiated. All methods and attributes
         are class methods and class attributes.
 
         Raises
@@ -1048,11 +1067,12 @@ class AbstractModelStudy(abc.ABC):
                  f"ts -S {n_total_jobs}",
                  "ts -C"]
 
-        if cls.GET_ACCURACY_METRICS_USE_GPU or cls.GET_HARDWARE_METRICS_USE_GPU:
+        if (cls.GET_ACCURACY_METRICS_USE_GPU or
+                cls.GET_HARDWARE_METRICS_USE_GPU):
             lines += ["ts --set_gpu_free_perc 80"]
 
         lines += ["",
-                 "# Queue jobs"]
+                  "# Queue jobs"]
 
         if cls.GET_ACCURACY_METRICS_USE_GPU:
             get_accuracy_metrics_gpu_option = "-G 1 "
@@ -1170,11 +1190,12 @@ class AbstractModelStudy(abc.ABC):
                  f"ts -S {n_total_jobs}",
                  "ts -C"]
 
-        if cls.GET_ACCURACY_METRICS_USE_GPU or cls.GET_HARDWARE_METRICS_USE_GPU:
+        if (cls.GET_ACCURACY_METRICS_USE_GPU or
+                cls.GET_HARDWARE_METRICS_USE_GPU):
             lines += ["ts --set_gpu_free_perc 80"]
 
         lines += ["",
-                 "# Queue jobs"]
+                  "# Queue jobs"]
 
         if cls.GET_ACCURACY_METRICS_USE_GPU:
             get_accuracy_metrics_gpu_option = "-G 1 "
@@ -1217,7 +1238,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _create_run_outer_loop_sh(cls, target_dir: pathlib.Path,
-                                   run_outer_loop_iteration_paths: List[pathlib.Path]):
+                                  run_outer_loop_iteration_paths: List[pathlib.Path]):
         datetime_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
         lines = ["#!/bin/bash",
@@ -1277,23 +1298,23 @@ class AbstractModelStudy(abc.ABC):
         # setup_inner_loops()
         setup_inner_loops_params = []
         setup_inner_loops_cmd = click.Command("setup-inner-loops",
-                                  callback=cls._cli_setup_inner_loops,
-                                  params=setup_inner_loops_params)
+                                              callback=cls._cli_setup_inner_loops,
+                                              params=setup_inner_loops_params)
 
         # setup_outer_loop()
         setup_outer_loop_params = []
         setup_outer_loop_cmd = click.Command("setup-outer-loop",
-                                              callback=cls._cli_setup_outer_loop,
-                                              params=setup_outer_loop_params)
+                                             callback=cls._cli_setup_outer_loop,
+                                             params=setup_outer_loop_params)
 
         # init_trial()
         init_trial_params = [click.Option(["-u", "--study-storage-url", "study_storage_url"],
-                                           type=str, required=True),
-                           click.Option(["-n", "--study-name", "study_name"],
-                                           type=str, required=True),
-                           click.Option(["-s", "--sampler_path", "sampler_path"],
-                               type=str, required=True)
-                           ]
+                                          type=str, required=True),
+                             click.Option(["-n", "--study-name", "study_name"],
+                                          type=str, required=True),
+                             click.Option(["-s", "--sampler_path", "sampler_path"],
+                                          type=str, required=True),
+                             ]
         init_trial_cmd = click.Command("init_trial",
                                        callback=cls._cli_init_trial,
                                        params=init_trial_params)
@@ -1302,15 +1323,15 @@ class AbstractModelStudy(abc.ABC):
         get_hardware_metrics_params = [
             click.Option(["-t", "--trial-path", "trial_path"],
                          type=str, required=True),
-        click.Option(["--inner-loop", "inner_loop"],
-                     is_flag=True, default=False),
-        click.Option(["--outer-loop", "outer_loop"],
-                     is_flag=True, default=False),
+            click.Option(["--inner-loop", "inner_loop"],
+                         is_flag=True, default=False),
+            click.Option(["--outer-loop", "outer_loop"],
+                         is_flag=True, default=False),
             click.Option(["-i", "--inner-fold", "inner_fold"],
                          type=int, required=False)]
         get_hardware_metrics_cmd = click.Command("get_hardware_metrics",
-                                            callback=cls._cli_get_hardware_metrics,
-                                            params=get_hardware_metrics_params)
+                                                 callback=cls._cli_get_hardware_metrics,
+                                                 params=get_hardware_metrics_params)
 
         # get_accuracy_metrics()
         get_accuracy_metrics_params = [
@@ -1323,21 +1344,21 @@ class AbstractModelStudy(abc.ABC):
             click.Option(["-i", "--inner-fold", "inner_fold"],
                          type=int, required=False)]
         get_accuracy_metrics_cmd = click.Command("get_accuracy_metrics",
-                                            callback=cls._cli_get_accuracy_metrics,
-                                            params=get_accuracy_metrics_params)
+                                                 callback=cls._cli_get_accuracy_metrics,
+                                                 params=get_accuracy_metrics_params)
 
         # complete_trial()
         complete_trial_params = [click.Option(
-                                     ["-t", "--trial-path", "trial_path"],
-                                     type=str, required=True),
+            ["-t", "--trial-path", "trial_path"],
+            type=str, required=True),
             click.Option(["--inner-loop", "inner_loop"],
                          is_flag=True, default=False),
             click.Option(["--outer-loop", "outer_loop"],
                          is_flag=True, default=False)
-                           ]
+        ]
         complete_trial_cmd = click.Command("complete_trial",
-                                       callback=cls._cli_complete_trial,
-                                       params=complete_trial_params)
+                                           callback=cls._cli_complete_trial,
+                                           params=complete_trial_params)
 
         # Group all commands
         group = click.Group(commands=[self_test_cmd,
@@ -1447,7 +1468,7 @@ class AbstractModelStudy(abc.ABC):
 
     @classmethod
     def _cli_complete_trial(cls, trial_path: str, inner_loop: bool,
-                                  outer_loop: bool):
+                            outer_loop: bool):
         """
         Command-line entry point for the function complete_trial().
         """

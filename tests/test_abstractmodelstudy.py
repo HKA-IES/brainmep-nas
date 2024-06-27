@@ -9,7 +9,6 @@ from typing import Type
 # import third-party modules
 import pytest
 import optuna
-from click.testing import CliRunner
 
 # import your own module
 from brainmepnas import AbstractModelStudy
