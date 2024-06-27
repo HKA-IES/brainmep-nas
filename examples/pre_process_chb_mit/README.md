@@ -18,7 +18,7 @@ python process_time_series.py -i {chb_mit_directory} -o {desired_output_director
 ```
 To process features, run
 ```
-python process_features.py -i {chb_mit_directory} -o {desired_output_directory}
+python process_features.py -i {processed_time_series} -o {desired_output_directory}
 ```
 
 ## Time-series processing
@@ -43,4 +43,18 @@ in 2022 IEEE Biomedical Circuits and Systems Conference (BioCAS), Oct. 2022,
 pp. 640–644. doi: 10.1109/BioCAS54905.2022.9948637.
 
 ## Features processing
-TBD
+Features processing is done based on processed time-series. The following 
+features are calculated for the four channels:
+- variance
+- skewness
+- kurtosis
+- median absolute deviation
+- line length
+- maximum
+- max power
+- mean power
+- power variance
+- theta band power
+- beta band power
+- gamma band power
+- epi index.

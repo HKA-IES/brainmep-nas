@@ -24,7 +24,8 @@ class Dataset:
 
     To load a dataset: dataset = Dataset(directory)
     To create a dataset: create_new_dataset(directory, ...)
-    To add a record to an existing dataset: add_record_to_dataset(directory, ...)
+    To add a record to an existing dataset:
+        add_record_to_dataset(directory, ...)
 
     Dataset creation and modification is separated from the Dataset class
     because modifying a data set should be done in different contexts than
@@ -45,8 +46,7 @@ class Dataset:
             self._directory = pathlib.Path(self._directory)
 
         if not os.path.isdir(self._directory):
-            raise ValueError(
-                f"No dataset found at location {self._directory}.")
+            raise ValueError(f"No dataset found at {self._directory}.")
 
         # Read properties
         properties_file_path = self._directory / "properties.json"
@@ -61,11 +61,11 @@ class Dataset:
         self._test_records = {}
         self._patients = []
         self._nb_records_per_patient = {}
-        for id, val in properties["patients"].items():
-            self._train_records[id] = val["train_records"]
-            self._test_records[id] = val["test_records"]
-            self._patients.append(id)
-            self._nb_records_per_patient[id] = len(self._train_records[id])
+        for patient, val in properties["patients"].items():
+            self._train_records[patient] = val["train_records"]
+            self._test_records[patient] = val["test_records"]
+            self._patients.append(patient)
+            self._nb_records_per_patient[patient] = len(self._train_records[patient])
 
         sample_data_file_path = (self._directory /
                                  self._train_records[self.patients[0]][0])
@@ -76,7 +76,7 @@ class Dataset:
 
     def get_data(self, patients_records: Union[str, Dict[str, Union[str, List[int]]]],
                  set: Literal["train", "test"], shuffle: bool = False,
-                 shuffle_seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
+                 shuffle_seed: int = 42) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns the train or test data and labels for the desired
         patients-records map.
@@ -89,7 +89,8 @@ class Dataset:
             Examples:
                 Selecting all records from all patients
                     patients_records = "all"
-                Selecting all records from patient "1" and records 0, 1 from patient "2"
+                Selecting all records from patient "1" and records 0, 1 from
+                patient "2"
                     patients_records = {"1": "all",
                                         "2": [0, 1]}
         set: Literal["train", "test"]
@@ -156,9 +157,9 @@ class Dataset:
         cross-validation for a single patient.
 
         Example use:
-        for train, test in dataset.split_leave_one_record_out("1"):
-            train_x, train_y = dataset.get_data(train)
-            test_x, test_y = dataset.get_data(test)
+        for train_recs, test_recs in dataset.split_leave_one_record_out("1"):
+            train_x, train_y = dataset.get_data(train_recs, "train")
+            test_x, test_y = dataset.get_data(test_recs, "test")
 
         Parameters
         ----------
@@ -190,9 +191,9 @@ class Dataset:
         cross-validation for.
 
         Example use:
-        for train, test in dataset.split_leave_one_patient_out():
-            train_x, train_y = dataset.get_data(train)
-            test_x, test_y = dataset.get_data(test)
+        for train_recs, test_recs in dataset.split_leave_one_patient_out():
+            train_x, train_y = dataset.get_data(train_recs, "train")
+            test_x, test_y = dataset.get_data(test_recs, "test")
 
         Yields
         ------
@@ -215,14 +216,14 @@ class Dataset:
         return len(self.patients)
 
     @property
-    def patients(self) -> list[str]:
+    def patients(self) -> List[str]:
         """
         List of patients in dataset.
         """
         return self._patients[:]
 
     @property
-    def nb_records_per_patient(self) -> dict[str: int]:
+    def nb_records_per_patient(self) -> Dict[str, int]:
         """
         Number of records per patient
         """
@@ -266,7 +267,7 @@ class Dataset:
         return self._test_window_offset
 
     @property
-    def data_shape(self) -> tuple[int, int]:
+    def data_shape(self) -> Tuple[int, int]:
         """
         Shape of each data point (samples, channels)
         """
