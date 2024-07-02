@@ -44,7 +44,7 @@ class BaseModelStudy(AbstractModelStudy):
 
     SAMPLER = optuna.samplers.TPESampler(seed=42)
     N_FOLDS = 5     # Patient 5 has 5 records with a seizure.
-    N_TRIALS = 5    # Small to ensure example runs relatively fast.
+    N_TRIALS = 50    # Small to ensure example runs relatively fast.
     GET_HARDWARE_METRICS_CALL = "once"
     OBJ_1_METRIC = "sample_sensitivity"
     OBJ_1_SCALING = lambda x: x
