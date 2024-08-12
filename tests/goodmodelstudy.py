@@ -22,7 +22,8 @@ class GoodModelStudy(AbstractModelStudy):
     NAME = "dummy_model_study_1"
     SAMPLER = optuna.samplers.RandomSampler()
     BASE_DIR = pathlib.Path("dummy_model_study_1/")
-    N_FOLDS = 3
+    N_OUTER_FOLDS = 5
+    N_INNER_FOLDS = 2
     N_TRIALS = 5
     THIS_FILE = pathlib.Path(__file__)
 
