@@ -7,6 +7,12 @@ Brain-MEP Project.
 
 **Note: this package is a work in progress**
 
+## Requirements
+- Linux distribution
+  - If you are under Windows, consider using [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/install) (WSL)
+- [task-spooler](https://github.com/justanhduc/task-spooler)
+- [SQLite 3](https://sqlite.org/)
+
 ## Install it from the repository
 Tested with Python 3.12.
 
@@ -18,30 +24,6 @@ pip install git+https://github.com/jonathanlarochelle/brainmep-nas
 The package *brainmepnas* consists in utility modules to faciliate the 
 implementation of a NAS process for the Brain-MEP project. Example uses are
 shown in examples/.
-
-## To-do
-- [ ] Metrics calculations
-  - [x] AccuracyMetrics - calculates inference accuracy metrics like ROC-AUC, 
-sensitivity, and false detections per hour.
-  - [x] HardwareMetrics - calculates hardware metrics like energy and latency 
-per inference.
-    - [x] MltkHardwareMetrics - HardwareMetrics implementation using the 
-Silicon Labs MLTK Model Profiler.
-    - [x] TestbenchHardwareMetrics - HardwareMetrics implementation using the 
-BrainMEP Seizure Detection Testbench.
-    - [ ] RandomForestHardwareMetrics - HardwareMetrics implementation to 
-estimate or measure the performance of random forest classifiers.
-  - [x] CombinedMetrics - calculates metrics which combine accuracy and hardware
-values like the combined energy for inferences and false detections per hour.
-- [ ] Dataset utilities
-  - [ ] Dataset class
-- [ ] Study utilities
-  - [ ] Script for study creation
-  - [ ] Script for running a study
-  - [ ] Script for running a single trial
-  - [ ] Script for fully training best trials from study
-- [ ] Visualization utilities
-  - [ ] TBD
 
 ## Development
 Please note that the goal of this package is not to offer a general framework 

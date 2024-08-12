@@ -3,3 +3,5 @@
 *.egg-info
 build/
 remotetestbench.ini
+examples/epidenet_nas/cpu_modelstudy/
+examples/epidenet_nas/gpu_modelstudy/

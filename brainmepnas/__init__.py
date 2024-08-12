@@ -2,6 +2,7 @@ from .dataset import Dataset
 from .accuracymetrics import AccuracyMetrics
 from .hardwaremetrics import HardwareMetrics
 from .combinedmetrics import CombinedMetrics
+from .abstractmodelstudy import AbstractModelStudy
 
 # Note: mltkhardwaremetrics.MltkHardwareMetrics and
 # testbenchhardwaremetrics.TestbenchHardwareMetrics are not automatically
