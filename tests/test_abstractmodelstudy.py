@@ -71,7 +71,7 @@ class TestAbstractModelStudy:
         assert os.path.isdir(base_dir)
         assert os.path.isfile(base_dir / "study_storage.db")
         assert os.path.isfile(base_dir / "run_all_inner_loops.sh")
-        for outer_fold in range(GoodModelStudy.N_FOLDS):
+        for outer_fold in range(GoodModelStudy.N_OUTER_FOLDS):
             outer_fold_dir = GoodModelStudy.BASE_DIR / f"outer_fold_{outer_fold}"
             assert os.path.isdir(outer_fold_dir)
             assert os.path.isfile(outer_fold_dir / "sampler.pickle")
@@ -95,7 +95,7 @@ class TestAbstractModelStudy:
         base_dir = GoodModelStudy.BASE_DIR
 
         assert os.path.isfile(base_dir / "run_outer_loop.sh")
-        for outer_fold in range(GoodModelStudy.N_FOLDS):
+        for outer_fold in range(GoodModelStudy.N_OUTER_FOLDS):
             assert os.path.isfile(base_dir / f"outer_fold_{outer_fold}" / "process_pareto_set.sh")
 
         self.delete_model_study_directory(GoodModelStudy)
@@ -377,8 +377,8 @@ class TestAbstractModelStudy:
         trial = GoodModelStudy.init_trial(study)
 
         GoodModelStudy.get_hardware_metrics(trial, "inner")
+        GoodModelStudy.get_accuracy_metrics(trial, "inner", 0)
         GoodModelStudy.get_accuracy_metrics(trial, "inner", 1)
-        GoodModelStudy.get_accuracy_metrics(trial, "inner", 2)
 
         assert study.trials[-1].state == optuna.trial.TrialState.RUNNING
         GoodModelStudy.complete_trial(trial, "inner")

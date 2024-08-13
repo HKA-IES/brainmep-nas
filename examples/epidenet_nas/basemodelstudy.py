@@ -3,6 +3,7 @@
 # import built-in module
 from typing import Dict, Any, Optional, Literal
 import pathlib
+import itertools
 
 # import third-party modules
 import optuna
@@ -43,7 +44,8 @@ class BaseModelStudy(AbstractModelStudy):
     # GET_HARDWARE_METRICS_USE_GPU: bool
 
     SAMPLER = optuna.samplers.TPESampler(seed=42)
-    N_FOLDS = 5     # Patient 5 has 5 records with a seizure.
+    N_OUTER_FOLDS = 5     # Patient 5 has 5 records with a seizure.
+    N_INNER_FOLDS = 2
     N_TRIALS = 50    # Small to ensure example runs relatively fast.
     GET_HARDWARE_METRICS_CALL = "once"
     OBJ_1_METRIC = "sample_sensitivity"
@@ -52,6 +54,12 @@ class BaseModelStudy(AbstractModelStudy):
     OBJ_2_METRIC = "inference_energy"
     OBJ_2_SCALING = lambda x: (np.log10(x) + 2) / 3
     OBJ_2_DIRECTION = "minimize"
+
+    SEIZURES_PER_FOLD = {0: [[1, 2], [3, 4]],
+                         1: [[0, 2], [3, 4]],
+                         2: [[0, 1], [3, 4]],
+                         3: [[0, 1], [2, 4]],
+                         4: [[0, 1], [2, 3]]}
 
     @classmethod
     def _sample_search_space(cls, trial: optuna.Trial) -> Dict[str, Any]:
@@ -164,16 +172,16 @@ class BaseModelStudy(AbstractModelStudy):
         # tf.config.experimental.enable_op_determinism()
 
         # Get test and train data
-        patient_5_records = [i for i in range(5)]
 
         if loop == "inner":
-            test_seizures = [patient_5_records[inner_fold]]
-            train_seizures = [rec for idx, rec in enumerate(patient_5_records)
-                              if idx != inner_fold and idx != outer_fold]
+            test_seizures = cls.SEIZURES_PER_FOLD[outer_fold][inner_fold]
+            train_seizures = [rec for idx, rec
+                              in enumerate(cls.SEIZURES_PER_FOLD[outer_fold])
+                              if idx != inner_fold]
+            train_seizures = list(itertools.chain.from_iterable(train_seizures))
         else:
-            test_seizures = [patient_5_records[outer_fold]]
-            train_seizures = [rec for idx, rec in enumerate(patient_5_records)
-                              if idx != outer_fold]
+            test_seizures = [outer_fold]
+            train_seizures = [i for i in range(5) if i != outer_fold]
 
         dataset = Dataset(cls.DATASET_DIR)
 

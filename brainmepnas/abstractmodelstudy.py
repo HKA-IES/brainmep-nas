@@ -97,9 +97,12 @@ class AbstractModelStudy(abc.ABC):
         Directory to store all model study files. This directory should not
         exist beforehand, it will be created when the model study setups
         itself.
-    N_FOLDS: int
-        Number of cross-validation folds. For F folds, F outer loops are
-        performed, each with (F-1) inner loops.
+    N_OUTER_FOLDS: int
+        Number of cross-validation folds to validate the generalization of the
+        optimization process.
+    N_INNER_FOLDS: int
+        Number of cross-validation folds for the validation inside a single
+        trial.
     N_TRIALS: int
         Number of different models to try in each inner loop.
     THIS_FILE: pathlib.Path
@@ -169,7 +172,8 @@ class AbstractModelStudy(abc.ABC):
     NAME: str
     SAMPLER: optuna.samplers.BaseSampler
     BASE_DIR: pathlib.Path
-    N_FOLDS: int
+    N_INNER_FOLDS: int
+    N_OUTER_FOLDS: int
     N_TRIALS: int
     THIS_FILE: pathlib.Path
 
@@ -356,7 +360,8 @@ class AbstractModelStudy(abc.ABC):
         """
         # Check that all attributes are defined.
         # Adapted from https://stackoverflow.com/a/55544173
-        required_class_variables = ["NAME", "SAMPLER", "BASE_DIR", "N_FOLDS",
+        required_class_variables = ["NAME", "SAMPLER", "BASE_DIR",
+                                    "N_OUTER_FOLDS", "N_INNER_FOLDS",
                                     "N_TRIALS", "THIS_FILE", "OBJ_1_METRIC",
                                     "OBJ_1_SCALING", "OBJ_1_DIRECTION",
                                     "OBJ_2_METRIC", "OBJ_2_SCALING",
@@ -457,15 +462,15 @@ class AbstractModelStudy(abc.ABC):
         consists in evaluating the different Pareto sets on unseen data.
 
         Example:
-            - Desired number of folds is 5, which means that the dataset is
-            split in 5.
-            - There is one inner loop per fold (in this case, 5), where each
-            inner loop is performed on the whole dataset excluding one fold.
-            For a given inner loop, 4 folds are made available.
+            - Desired number of outer folds is N_OUTER_FOLDS, which means that
+            the dataset is split in N_OUTER_FOLDS.
+            - There is one inner loop per outer fold, where each inner loop is
+            performed on the whole dataset excluding one fold. For a given
+            inner loop, (N_OUTER_FOLDS-1) folds are made available.
             - In each trial of an inner loop, a cross-validation process is
-            performed on the 4 folds: 4 models are trained, each with leaving
-            out one of the folds for testing. The trial performance is the
-            mean performance of all trials.
+            performed with N_INNER_FOLDS folds: N_INNER_FOLDS models are
+            trained, each with leaving out one of the folds for testing. The
+            trial performance is the mean performance of all trials.
 
         All data related to the model study are stored in BASE_DIR. All studies
         are placed in study_storage.db. Each study has a folder where scripts
@@ -490,7 +495,7 @@ class AbstractModelStudy(abc.ABC):
 
         # One study per outer fold
         run_inner_loop_files = []
-        for outer_fold in range(cls.N_FOLDS):
+        for outer_fold in range(cls.N_OUTER_FOLDS):
             outer_fold_dir = cls.BASE_DIR / f"outer_fold_{outer_fold}"
             os.mkdir(outer_fold_dir)
 
@@ -514,8 +519,7 @@ class AbstractModelStudy(abc.ABC):
             run_trial_sh_path = cls._create_run_trial_sh(outer_fold_dir,
                                                          study_storage_url,
                                                          study_name,
-                                                         sampler_path,
-                                                         outer_fold)
+                                                         sampler_path)
             run_inner_loop_sh_path = cls._create_run_inner_loop_sh(outer_fold_dir,
                                                                    run_trial_sh_path)
             run_inner_loop_files.append(run_inner_loop_sh_path)
@@ -545,7 +549,7 @@ class AbstractModelStudy(abc.ABC):
         study_storage = optuna.storages.RDBStorage(study_storage_url)
 
         run_outer_loop_iteration_files = []
-        for outer_fold in range(cls.N_FOLDS):
+        for outer_fold in range(cls.N_OUTER_FOLDS):
             study_name = cls.NAME + "_outer_fold_" + str(outer_fold)
             study = optuna.load_study(storage=study_storage,
                                       study_name=study_name)
@@ -663,11 +667,9 @@ class AbstractModelStudy(abc.ABC):
         if loop not in ["inner", "outer"]:
             raise ValueError("loop must be either 'inner' or 'outer'.")
         if inner_fold is not None:
-            if not (0 <= inner_fold < cls.N_FOLDS):
+            if not (0 <= inner_fold < cls.N_INNER_FOLDS):
                 raise ValueError("inner_fold must be an integer between 0 and "
                                  "N_FOLDS.")
-            if inner_fold == outer_fold:
-                raise ValueError("inner_fold cannot be equal to outer_fold.")
 
         # Prepare description
         if loop == "inner":
@@ -752,11 +754,9 @@ class AbstractModelStudy(abc.ABC):
         if loop not in ["inner", "outer"]:
             raise ValueError("loop must be either 'inner' or 'outer'.")
         if inner_fold is not None:
-            if not (0 <= inner_fold < cls.N_FOLDS):
+            if not (0 <= inner_fold < cls.N_INNER_FOLDS):
                 raise ValueError("inner_fold must be an integer between 0 and "
                                  "N_FOLDS.")
-            if inner_fold == outer_fold:
-                raise ValueError("inner_fold cannot be equal to outer_fold.")
 
         # Prepare description
         if loop == "inner":
@@ -836,11 +836,9 @@ class AbstractModelStudy(abc.ABC):
         if loop not in ["inner", "outer"]:
             raise ValueError("loop must be either 'inner' or 'outer'.")
         if inner_fold is not None:
-            if not (0 <= inner_fold < cls.N_FOLDS):
+            if not (0 <= inner_fold < cls.N_INNER_FOLDS):
                 raise ValueError("inner_fold must be an integer between 0 and "
                                  "N_FOLDS.")
-            if inner_fold == outer_fold:
-                raise ValueError("inner_fold cannot be equal to outer_fold.")
 
         # Prepare description
         if loop == "inner":
@@ -915,14 +913,13 @@ class AbstractModelStudy(abc.ABC):
             raise ValueError("loop must be either 'inner' or 'outer'.")
 
         if loop == "inner":
-            inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
 
             metrics_dicts = []
 
             try:
                 # For each inner fold, get CombinedMetrics from AccuracyMetrics
                 # and HardwareMetrics
-                for f in inner_folds:
+                for f in range(cls.N_INNER_FOLDS):
                     am_path = (trial_dir /
                                f"inner_fold_{f}_accuracy_metrics.pickle")
                     am = pickle.load(open(am_path, "rb"))
@@ -1044,7 +1041,7 @@ class AbstractModelStudy(abc.ABC):
     @classmethod
     def _create_run_trial_sh(cls, target_dir: pathlib.Path,
                              study_storage: str, study_name: str,
-                             sampler_path: pathlib.Path, outer_fold: int) -> pathlib.Path:
+                             sampler_path: pathlib.Path) -> pathlib.Path:
         """
         Generate run_trial.sh script in target_dir.
         """
@@ -1091,8 +1088,7 @@ class AbstractModelStudy(abc.ABC):
             lines += [f"{job_names[-1]}=$(ts {get_hardware_metrics_gpu_option}python {cls.THIS_FILE} get_hardware_metrics -t {trial_path.resolve()} --inner-loop)"]
 
         # Call per_inner_fold
-        inner_folds = [i for i in range(cls.N_FOLDS) if i != outer_fold]
-        for inner_fold in inner_folds:
+        for inner_fold in range(cls.N_INNER_FOLDS):
             job_names.append(f"job_{len(job_names)}")
             lines += [f"{job_names[-1]}=$(ts {get_accuracy_metrics_gpu_option}python {cls.THIS_FILE} get_accuracy_metrics -t {trial_path.resolve()} --inner-loop -i {inner_fold})"]
 
