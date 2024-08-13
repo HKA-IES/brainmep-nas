@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # import built-in module
+from typing import List
 
 # import third-party modules
 import matplotlib.pyplot as plt
@@ -8,6 +9,8 @@ import optuna
 import numpy as np
 from optuna.visualization._hypervolume_history import (
     _get_hypervolume_history_info)
+from optuna.importance import get_param_importances
+import pandas as pd
 
 # import your own module
 from .abstractmodelstudy import AbstractModelStudy
@@ -33,6 +36,11 @@ def plot_hypervolume(modelstudy: type[AbstractModelStudy],
         Apply log scale to x axis.
     logy: bool = False
         Apply log scale to y axis.
+
+    Returns
+    -------
+    fig: plt.Figure
+        Hypervolume plot.
     """
     study_storage = f"sqlite:///{modelstudy.BASE_DIR}/study_storage.db"
 
@@ -92,9 +100,62 @@ def plot_pareto_front(modelstudy: type[AbstractModelStudy], loop: str,
     pass
 
 
-def plot_parameters_importance(modelstudy: type[AbstractModelStudy],
-                               metric: str) -> plt.Figure:
-    pass
+def plot_parameters_importance(modelstudy: type[AbstractModelStudy]) -> plt.Figure:
+    """
+    Plot the hypervolume with respect to trials for a given study.
+
+    Parameters
+    ----------
+    modelstudy: type[AbstractModelStudy]
+        Target study.
+
+    Returns
+    -------
+    fig: plt.Figure
+        Parameters importance plot.
+    """
+    study_storage = f"sqlite:///{modelstudy.BASE_DIR}/study_storage.db"
+
+    param_importance_obj_1_list = []
+    param_importance_obj_2_list = []
+    for outer_fold in range(modelstudy.N_FOLDS):
+        study_name = f"{modelstudy.NAME}_outer_fold_{outer_fold}"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+        param_importance_obj_1 = get_param_importances(study,
+                                                       target=lambda t: t.values[0])
+        param_importance_obj_2 = get_param_importances(study,
+                                                       target=lambda t: t.values[1])
+        param_importance_obj_1_list.append(param_importance_obj_1)
+        param_importance_obj_2_list.append(param_importance_obj_2)
+
+    df_obj_1 = pd.DataFrame(param_importance_obj_1_list)
+    df_obj_2 = pd.DataFrame(param_importance_obj_2_list)
+    df_obj_1 = df_obj_1.reindex(sorted(df_obj_1.columns, reverse=True), axis=1)
+    df_obj_2 = df_obj_2.reindex(sorted(df_obj_2.columns, reverse=True), axis=1)
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+    ax.barh(df_obj_1.columns, df_obj_1.mean(), height=0.4, align="edge",
+            xerr=df_obj_1.std(),
+            label=modelstudy.OBJ_1_METRIC,
+            error_kw={'capsize': 3})
+    ax.barh(df_obj_2.columns, df_obj_2.mean(), height=-0.4, align="edge",
+            xerr=df_obj_2.std(),
+            label=modelstudy.OBJ_2_METRIC,
+            error_kw={'capsize': 3})
+
+    ax.grid(True)
+    ax.set_title(f"Parameters importance")
+    ax.set_xlabel("Importance")
+    ax.legend()
+
+    xlim = ax.get_xlim()
+    ax.set_xlim((0, xlim[1]))
+
+    plt.tight_layout()
+    plt.show()
+
+    return fig
 
 
 def plot_parameters_distribution(modelstudy: type[AbstractModelStudy],
