@@ -158,6 +158,51 @@ def plot_parameters_importance(modelstudy: type[AbstractModelStudy]) -> plt.Figu
     return fig
 
 
-def plot_parameters_distribution(modelstudy: type[AbstractModelStudy],
-                                 metric: str) -> plt.Figure:
-    pass
+def plot_parameters_distribution(modelstudy: type[AbstractModelStudy]) -> List[plt.Figure]:
+    """
+    Plot the distribution of all parameters for a given study.
+
+    Parameters
+    ----------
+    modelstudy: type[AbstractModelStudy]
+        Target study.
+
+    Returns
+    -------
+    fig: List[plt.Figure]
+        List of parameters distribution plots.
+    """
+    study_storage = f"sqlite:///{modelstudy.BASE_DIR}/study_storage.db"
+
+    figs = []
+
+    for outer_fold in range(modelstudy.N_FOLDS):
+        study_name = f"{modelstudy.NAME}_outer_fold_{outer_fold}"
+        study = optuna.load_study(study_name=study_name,
+                                  storage=study_storage)
+
+        n_params = len(study.trials[0].params)
+        if n_params > 1:
+            n_cols = 2
+        else:
+            n_cols = 1
+        n_rows = int(np.ceil(n_params / n_cols))
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(3*n_cols, 2*n_rows))
+        axs = axs.flatten()
+
+        all_params = []
+        for trial in study.trials:
+            all_params.append(trial.params)
+
+        df = pd.DataFrame(all_params)
+        df.hist(ax=axs[:n_params])
+        for ax in axs[:n_params]:
+            ax.set_xlabel("Value")
+            ax.set_ylabel("Frequency")
+        fig.suptitle(f"Parameter distribution (outer fold {outer_fold})")
+        plt.tight_layout()
+        plt.show()
+
+        figs.append(fig)
+
+    return figs
