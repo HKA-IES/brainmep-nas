@@ -1,6 +1,6 @@
 # BrainMEP NAS - PUBLIC REPO
 
-![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+![Python](https://img.shields.io/badge/python-3.8|3.9|3.10|3.11|3.12-blue.svg)
 
 This repository contains the public code used for the NAS process for the
 Brain-MEP Project.
@@ -14,7 +14,6 @@ Brain-MEP Project.
 - [SQLite 3](https://sqlite.org/)
 
 ## Install it from the repository
-Tested with Python 3.12.
 
 ```
 pip install git+https://github.com/jonathanlarochelle/brainmep-nas

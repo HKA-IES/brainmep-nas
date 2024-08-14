@@ -1,4 +1,6 @@
 # Example - Neural Architecture Search with EpiDeNet Architecture
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+
 This example demonstrates the implementation of an AbstractModelStudy to optimize the 
 EpiDeNet architecture for epileptic seizure detection.
 
@@ -9,6 +11,7 @@ EpiDeNet architecture for epileptic seizure detection.
 ## Requirements
 - Pre-processed CHB-MIT dataset, see examples/pre_process_chb_mit/
 - [optuna-dashboard](https://github.com/optuna/optuna-dashboard)
+- Python 3.12 (example not tested with older versions)
 
 ## Usage
 

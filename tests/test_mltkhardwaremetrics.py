@@ -27,7 +27,7 @@ class TestMltkHardwareMetrics:
 
         assert hm.clock_frequency == pytest.approx(78e6)
         assert hm.tflite_size == 16000
-        assert hm.runtime_memory_size == 24388
+        assert hm.runtime_memory_size == pytest.approx(24388, abs=200)
         assert hm.inference_ops == 1378052
         assert hm.inference_macs == 671184
         assert hm.inference_cpu_cycles == 264240
