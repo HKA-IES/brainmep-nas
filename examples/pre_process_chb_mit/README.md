@@ -6,7 +6,7 @@ and the creation of a Dataset object to manipulate the processed data. Processed
 is available both as time-series data (appropriate for CNN or RNN inference) and as
 features (appropriate for decision trees ensemble).
 
-Note: the full CHB-MIT Scall EEG Data requires 42.6 GB of memory space. The processed 
+Note: the full CHB-MIT Scalp EEG Data requires 42.6 GB of memory space. The processed 
 time series data requires 3.82 GB of memory space.
 
 ## Requirements
