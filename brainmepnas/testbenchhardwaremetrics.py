@@ -32,6 +32,7 @@ class TestbenchHardwareMetrics(HardwareMetrics):
 
     Note: The Seizure Detection Testbench is a private tool of the BrainMEP
     project and there are currently no plans of making it publicly available.
+    The package only supports Python >= 3.9.
 
     Attributes
     ----------
