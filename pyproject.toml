@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [{name = "Jonathan Larochelle", email = "jonathan.larochelle@imtek.uni-freiburg.de"}, ]
 description = "Utilities to run neural architecture search (NAS) processes as part of the Brain-MEP project."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

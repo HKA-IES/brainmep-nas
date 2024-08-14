@@ -1,4 +1,6 @@
 # Example - Pre-process CHB-MIT Dataset
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+
 This example demonstrates the pre-processing of the CHB-MIT Scalp EEG Dataset
 and the creation of a Dataset object to manipulate the processed data. Processed data
 is available both as time-series data (appropriate for CNN or RNN inference) and as
@@ -9,7 +11,8 @@ time series data requires 3.82 GB of memory space.
 
 ## Requirements
 - CHB-MIT Scalp EEG Database, [link](https://physionet.org/content/chbmit/1.0.0/).
-- Package [MNE-Python](https://mne.tools/stable/index.html).
+- Package [MNE-Python](https://mne.tools/stable/index.html). 
+- Python 3.12 (example not tested with older versions)
 
 ## Usage
 To process time series data, run
