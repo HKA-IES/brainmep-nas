@@ -47,9 +47,9 @@ class AccuracyMetrics:
     threshold_method: str
         Method used to set the threshold. Can be one of the following:
         - "fixed": threshold fixed by the user.
-        - "sample_max_f_score": threshold set to maximize the sample-based
+        - "max_sample_f_score": threshold set to maximize the sample-based
          F-score.
-        - "event_max_f_score": threshold set to maximize the event-based
+        - "max_event_f_score": threshold set to maximize the event-based
          F-score.
     threshold: float
         Threshold to separate seizure from non-seizure at a sample level. A
@@ -192,8 +192,8 @@ class AccuracyMetrics:
     """
     sample_duration: float
     sample_offset: float
-    threshold_method: Literal["fixed", "sample_max_f_score",
-                              "event_max_f_score"]
+    threshold_method: Literal["fixed", "max_sample_f_score",
+                              "max_event_f_score"]
     threshold: float
     event_minimum_rel_overlap: float
     event_preictal_tolerance: float
@@ -241,8 +241,8 @@ class AccuracyMetrics:
 
     def __init__(self, y_true: np.ndarray, y_pred: np.ndarray,
                  sample_duration: float, sample_offset: float,
-                 threshold: Union[Literal["sample_max_f_score",
-                                          "event_max_f_score"], float] = 0.5,
+                 threshold: Union[Literal["max_sample_f_score",
+                                          "max_event_f_score"], float] = 0.5,
                  event_minimum_rel_overlap: float = 0,
                  event_preictal_tolerance: float = 30,
                  event_postictal_tolerance: float = 60,
@@ -272,9 +272,9 @@ class AccuracyMetrics:
             1D array of predicted labels. Expected values between 0 and 1.
         threshold : str or float
             The threshold to apply. Either a fixed (float) threshold or 
-            - "sample_max_f_score": threshold which maximizes the sample-based
+            - "max_sample_f_score": threshold which maximizes the sample-based
             f-score.
-            - "event_max_f_score": threshold which maximizes the event-based
+            - "max_event_f_score": threshold which maximizes the event-based
             f-score.
         sample_duration : float
             Duration of a sample (signal window) in seconds.
@@ -382,21 +382,21 @@ class AccuracyMetrics:
         f_scores = np.delete(f_scores, nan_idx)
         prc_thresholds = np.delete(prc_thresholds, nan_idx)
 
-        if threshold == "sample_max_f_score":
-            self.threshold = self._get_threshold_sample_max_f_score(y_true,
+        if threshold == "max_sample_f_score":
+            self.threshold = self._get_threshold_max_sample_f_score(y_true,
                                                                     y_pred)
-            self.threshold_method = "sample_max_f_score"
-        elif threshold == "event_max_f_score":
-            self.threshold = self._get_threshold_event_max_f_score(y_true,
+            self.threshold_method = "max_sample_f_score"
+        elif threshold == "max_event_f_score":
+            self.threshold = self._get_threshold_max_event_f_score(y_true,
                                                                    y_pred)
-            self.threshold_method = "event_max_f_score"
+            self.threshold_method = "max_event_f_score"
         elif 0 <= float(threshold) <= 1:
             self.threshold = float(threshold)
             self.threshold_method = "fixed"
         else:
             raise ValueError("threshold should be either a number between 0 "
-                             "and 1 or one of ['sample_max_f_score', "
-                             "'event_max_f_score'].")
+                             "and 1 or one of ['max_sample_f_score', "
+                             "'max_event_f_score'].")
 
         y_pred = np.where(y_pred >= self.threshold, 1, 0)
         self.y_pred_post_threshold = y_pred
@@ -540,7 +540,7 @@ class AccuracyMetrics:
             self.event_average_detection_delay = np.nan
 
     @staticmethod
-    def _get_threshold_sample_max_f_score(y_true: np.ndarray,
+    def _get_threshold_max_sample_f_score(y_true: np.ndarray,
                                           y_pred: np.ndarray) -> float:
         """
         Compute threshold value which maximizes sample-based f-score.
@@ -563,7 +563,7 @@ class AccuracyMetrics:
 
         return float(prc_thresholds[np.argmax(f_scores)])
 
-    def _get_threshold_event_max_f_score(self, y_true: np.ndarray,
+    def _get_threshold_max_event_f_score(self, y_true: np.ndarray,
                                           y_pred: np.ndarray) -> float:
         """
         Compute threshold value which maximizes event-based f-score.

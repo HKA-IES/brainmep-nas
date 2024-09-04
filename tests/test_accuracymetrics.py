@@ -71,10 +71,10 @@ class TestAccuracyMetrics:
 
         assert am_1.threshold_method == "fixed"
 
-    def test_threshold_sample_max_f_score(self):
+    def test_threshold_max_sample_f_score(self):
         """
         Verify that the threshold is calculated correctly with the
-        sample_max_f_score method. In the two simple cases below, the
+        max_sample_f_score method. In the two simple cases below, the
         threshold should be <= 0.9 and <= 0.7 respectively, and the metrics
         should be equivalent.
         """
@@ -100,10 +100,10 @@ class TestAccuracyMetrics:
         sample_offset = 1
 
         am_1 = AccuracyMetrics(y_true, y_pred_1, sample_duration,
-                               sample_offset, threshold="sample_max_f_score")
+                               sample_offset, threshold="max_sample_f_score")
         am_2 = AccuracyMetrics(y_true, y_pred_2, sample_duration,
-                               sample_offset, threshold="sample_max_f_score")
-        assert am_1.threshold_method == "sample_max_f_score"
+                               sample_offset, threshold="max_sample_f_score")
+        assert am_1.threshold_method == "max_sample_f_score"
         assert am_1.threshold <= 0.9
         assert am_2.threshold <= 0.7
 
@@ -112,10 +112,10 @@ class TestAccuracyMetrics:
         assert am_1.sample_fp == am_2.sample_fp
         assert am_1.sample_fn == am_2.sample_fn
 
-    def test_threshold_event_max_f_score(self):
+    def test_threshold_max_event_f_score(self):
         """
         Verify that the threshold is calculated correctly with the
-        event_max_f_score method. In the two simple cases below, the
+        max_event_f_score method. In the two simple cases below, the
         threshold should be > 0.7 and > 0.5 respectively, and the metrics
         should be equivalent.
         """
@@ -138,20 +138,20 @@ class TestAccuracyMetrics:
         sample_offset = 1
 
         am_1 = AccuracyMetrics(y_true, y_pred_1, sample_duration,
-                               sample_offset, threshold="event_max_f_score",
+                               sample_offset, threshold="max_event_f_score",
                                event_minimum_rel_overlap=0.5,
                                event_preictal_tolerance=0,
                                event_postictal_tolerance=0,
                                event_minimum_separation=0,
                                event_maximum_duration=10)
         am_2 = AccuracyMetrics(y_true, y_pred_2, sample_duration,
-                               sample_offset, threshold="event_max_f_score",
+                               sample_offset, threshold="max_event_f_score",
                                event_minimum_rel_overlap=0.5,
                                event_preictal_tolerance=0,
                                event_postictal_tolerance=0,
                                event_minimum_separation=0,
                                event_maximum_duration=10)
-        assert am_1.threshold_method == "event_max_f_score"
+        assert am_1.threshold_method == "max_event_f_score"
         assert 0.7 < am_1.threshold <= 0.9
         assert 0.5 < am_2.threshold <= 0.7
 
