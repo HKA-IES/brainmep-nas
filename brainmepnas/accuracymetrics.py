@@ -10,7 +10,7 @@ import warnings
 import sklearn.metrics as sk_metrics
 import numpy as np
 from timescoring.annotations import Annotation
-from timescoring.scoring import SampleScoring, EventScoring
+from timescoring.scoring import EventScoring
 
 # import your own module
 
@@ -29,12 +29,6 @@ class AccuracyMetrics:
 
     The sample and event distinction is made in accordance with the proposed
     SzCORE - Seizure Community Open-source Research Evaluation framework[1].
-    Portions of the code were adapted from the implementation of the
-    sz-validation-framework package, available on Github:
-    https://github.com/esl-epfl/sz-validation-framework
-
-    A future goal is to formally integrate the scoring module of
-    sz-validation-framework in this class.
 
     References
     ----------
@@ -255,12 +249,7 @@ class AccuracyMetrics:
 
         The sample and event distinction is made in accordance with the
         proposed SzCORE - Seizure Community Open-source Research Evaluation
-        framework[1]. Portions of the code were adapted from the implementation
-        of the sz-validation-framework package, available on Github:
-        https://github.com/esl-epfl/sz-validation-framework
-
-        A future goal is to formally integrate the scoring module of
-        sz-validation-framework in this class.
+        framework[1].
 
         References
         ----------
@@ -398,100 +387,8 @@ class AccuracyMetrics:
         y_pred = np.where(y_pred >= self.threshold, 1, 0)
         self.y_pred_post_threshold = y_pred
 
-        # Sample-based metrics
-        (self.sample_tn,
-         self.sample_fp,
-         self.sample_fn,
-         self.sample_tp) = sk_metrics.confusion_matrix(y_true, y_pred,
-                                                       labels=[0, 1]).ravel()
-        
-        self.sample_sensitivity = (self.sample_tp /
-                                   (self.sample_tp + self.sample_fn))
-        self.sample_specificity = (self.sample_tn /
-                                   (self.sample_tn + self.sample_fp))
-        self.sample_precision = (self.sample_tp /
-                                 (self.sample_tp + self.sample_fp))
-        self.sample_accuracy = ((self.sample_tp + self.sample_tn) /
-                                self.n_samples)
-        self.sample_balanced_accuracy = ((self.sample_sensitivity + 
-                                          self.sample_specificity) / 2)
-        self.sample_recall = self.sample_sensitivity
-
-        self.sample_f_score = sk_metrics.f1_score(y_true, y_pred)
-
-        # Event-based metrics
-
-        # We use the timescoring package, which expects a binary mask of true
-        # and predicted events.
-
-        # We first convert y_true and y_pred to masks, where each element is
-        # the label for a time duration
-
-        label_duration = sample_offset
-        kernel = np.ones(int(sample_duration/label_duration))
-        mask_true = np.convolve(y_true, kernel).astype(np.bool_)
-        mask_pred = np.convolve(y_pred, kernel).astype(np.bool_)
-
-        annotations_true = Annotation(mask_true, 1/label_duration)
-        annotations_pred = Annotation(mask_pred, 1/label_duration)
-        self.events_true = annotations_true.events
-        self.events_pred = annotations_pred.events
-
-        events_parameters = EventScoring.Parameters(self.event_preictal_tolerance,
-                                                    self.event_postictal_tolerance,
-                                                    self.event_minimum_rel_overlap,
-                                                    self.event_maximum_duration,
-                                                    self.event_minimum_separation)
-        es = EventScoring(annotations_true, annotations_pred, events_parameters)
-        self.events_true_merged_split = es.ref.events
-        self.events_pred_merged_split = es.hyp.events
-
-        self.n_true_seizures = es.refTrue
-        self.event_tp = es.tp
-        self.event_fp = es.fp
-        self.event_sensitivity = es.sensitivity
-        self.event_recall = self.event_sensitivity
-
-        # Calculate metrics not in EventScoring
-        if self.event_tp == 0:                   
-            self.event_precision = np.nan                                            
-            self.event_f_score = np.nan
-        else:
-            self.event_precision = (self.event_tp /
-                                    (self.event_tp + self.event_fp))
-            self.event_f_score = (2 *
-                                  (self.event_precision * self.event_recall) /
-                                  (self.event_precision + self.event_recall))
-        total_duration = (len(y_true) - 1) * sample_offset + sample_duration
-        self.event_false_detections_per_hour = ((self.event_fp / total_duration)                
-                                                * 3600)
-
-        total_ictal_duration = np.sum(mask_true) * label_duration
-        self.event_false_detections_per_interictal_hour = ((self.event_fp / (total_duration -
-                                                                             total_ictal_duration) * 3600))
-
-        # Average detection delay
-        detection_delays = list()
-
-        for true_event in self.events_true_merged_split:
-            true_event_extended = (true_event[0]-event_preictal_tolerance,
-                                   true_event[1]+event_postictal_tolerance)
-
-            for pred_event in self.events_pred_merged_split:
-                abs_overlap = (min(true_event_extended[1], pred_event[1]) -
-                               max(true_event_extended[0], pred_event[0]))
-                rel_overlap = (abs_overlap /
-                               (true_event_extended[1] - true_event_extended[0]))
-
-                if rel_overlap > event_minimum_rel_overlap + 1e-6:
-                    detection_delay = np.max((event_preictal_tolerance,
-                                              pred_event[0]-true_event[0]))
-                    detection_delays.append(detection_delay)
-
-        if len(detection_delays) > 0:
-            self.event_average_detection_delay = np.average(detection_delays)
-        else:
-            self.event_average_detection_delay = np.nan
+        self._compute_sample_metrics(y_true, y_pred)
+        self._compute_event_metrics(y_true, y_pred)
 
     def as_dict(self) -> dict:
         """
@@ -507,3 +404,120 @@ class AccuracyMetrics:
                 d[field.name] = field_value
 
         return d
+
+    def _compute_sample_metrics(self, y_true: np.ndarray, y_pred: np.ndarray):
+        """
+        Compute sample-based metrics.
+
+        Parameters
+        ----------
+        y_true : np.ndarray(int)
+            1D array of true labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        y_pred : np.ndarray(int)
+            1D array of predicted labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        """
+        (self.sample_tn,
+         self.sample_fp,
+         self.sample_fn,
+         self.sample_tp) = sk_metrics.confusion_matrix(y_true, y_pred,
+                                                       labels=[0, 1]).ravel()
+
+        self.sample_sensitivity = (self.sample_tp /
+                                   (self.sample_tp + self.sample_fn))
+        self.sample_specificity = (self.sample_tn /
+                                   (self.sample_tn + self.sample_fp))
+        self.sample_precision = (self.sample_tp /
+                                 (self.sample_tp + self.sample_fp))
+        self.sample_accuracy = ((self.sample_tp + self.sample_tn) /
+                                self.n_samples)
+        self.sample_balanced_accuracy = ((self.sample_sensitivity +
+                                          self.sample_specificity) / 2)
+        self.sample_recall = self.sample_sensitivity
+
+        self.sample_f_score = sk_metrics.f1_score(y_true, y_pred)
+
+    def _compute_event_metrics(self, y_true: np.ndarray, y_pred: np.ndarray):
+        """
+        Compute event-based metrics.
+
+        Parameters
+        ----------
+        y_true : np.ndarray(int)
+            1D array of true labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        y_pred : np.ndarray(int)
+            1D array of predicted labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        """
+        label_duration = self.sample_offset
+        kernel = np.ones(int(self.sample_duration / label_duration))
+        mask_true = np.convolve(y_true, kernel).astype(np.bool_)
+        mask_pred = np.convolve(y_pred, kernel).astype(np.bool_)
+
+        annotations_true = Annotation(mask_true, 1 / label_duration)
+        annotations_pred = Annotation(mask_pred, 1 / label_duration)
+        self.events_true = annotations_true.events
+        self.events_pred = annotations_pred.events
+
+        events_parameters = EventScoring.Parameters(
+            self.event_preictal_tolerance,
+            self.event_postictal_tolerance,
+            self.event_minimum_rel_overlap,
+            self.event_maximum_duration,
+            self.event_minimum_separation)
+        es = EventScoring(annotations_true, annotations_pred,
+                          events_parameters)
+        self.events_true_merged_split = es.ref.events
+        self.events_pred_merged_split = es.hyp.events
+
+        self.n_true_seizures = es.refTrue
+        self.event_tp = es.tp
+        self.event_fp = es.fp
+        self.event_sensitivity = es.sensitivity
+        self.event_recall = self.event_sensitivity
+
+        # Calculate metrics not in EventScoring
+        if self.event_tp == 0:
+            self.event_precision = np.nan
+            self.event_f_score = np.nan
+        else:
+            self.event_precision = (self.event_tp /
+                                    (self.event_tp + self.event_fp))
+            self.event_f_score = (2 *
+                                  (self.event_precision * self.event_recall) /
+                                  (self.event_precision + self.event_recall))
+        total_duration = ((len(y_true) - 1) * self.sample_offset +
+                          self.sample_duration)
+        self.event_false_detections_per_hour = (
+                (self.event_fp / total_duration) * 3600)
+
+        total_ictal_duration = np.sum(mask_true) * label_duration
+        self.event_false_detections_per_interictal_hour = (
+        (self.event_fp / (total_duration -
+                          total_ictal_duration) * 3600))
+
+        # Average detection delay
+        detection_delays = list()
+
+        for true_event in self.events_true_merged_split:
+            true_event_extended = (true_event[0] - self.event_preictal_tolerance,
+                                   true_event[1] + self.event_postictal_tolerance)
+
+            for pred_event in self.events_pred_merged_split:
+                abs_overlap = (min(true_event_extended[1], pred_event[1]) -
+                               max(true_event_extended[0], pred_event[0]))
+                rel_overlap = (abs_overlap /
+                               (true_event_extended[1] - true_event_extended[
+                                   0]))
+
+                if rel_overlap > self.event_minimum_rel_overlap + 1e-6:
+                    detection_delay = np.max((self.event_preictal_tolerance,
+                                              pred_event[0] - true_event[0]))
+                    detection_delays.append(detection_delay)
+
+        if len(detection_delays) > 0:
+            self.event_average_detection_delay = np.average(detection_delays)
+        else:
+            self.event_average_detection_delay = np.nan
