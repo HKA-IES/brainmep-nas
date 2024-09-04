@@ -218,34 +218,41 @@ class TestAccuracyMetrics:
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
 
         expected_events_true = [(5, 9),
-                                (17, 26),
+                                (17, 21),
+                                (22, 26),
                                 (29, 33),
                                 (35, 39),
-                                (43, 55),
-                                (55, 59)]
+                                (43, 59)]
 
-        expected_events_true_extended = [(4, 11),
-                                         (16, 28),
-                                         (28, 35),
-                                         (34, 41),
-                                         (42, 57),
-                                         (54, 61)]
+        expected_events_true_merged_split = [(5, 9),
+                                             (17, 26),
+                                             (29, 33),
+                                             (35, 39),
+                                             (43, 55),
+                                             (55, 59)]
 
         expected_events_pred = [(0, 5),
                                 (10, 17),
-                                (19, 28),
+                                (19, 23),
+                                (24, 28),
                                 (41, 49),
                                 (59, 63)]
 
+        expected_events_pred_merged_split = [(0, 5),
+                                             (10, 17),
+                                             (19, 28),
+                                             (41, 49),
+                                             (59, 63)]
+
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
-        assert am.event_minimum_overlap == pytest.approx(2.)
+        assert am.event_minimum_rel_overlap == pytest.approx(0.)
         assert am.event_preictal_tolerance == pytest.approx(1.)
         assert am.event_postictal_tolerance == pytest.approx(2.)
         assert am.event_minimum_separation == pytest.approx(2.)
@@ -255,12 +262,17 @@ class TestAccuracyMetrics:
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
-        for actual, expected in zip(am.events_true_extended,
-                                    expected_events_true_extended):
+        for actual, expected in zip(am.events_true_merged_split,
+                                    expected_events_true_merged_split):
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
         for actual, expected in zip(am.events_pred, expected_events_pred):
+            assert actual[0] == pytest.approx(expected[0])
+            assert actual[1] == pytest.approx(expected[1])
+
+        for actual, expected in zip(am.events_pred_merged_split,
+                                    expected_events_pred_merged_split):
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
@@ -273,22 +285,15 @@ class TestAccuracyMetrics:
 
         expected_events_true = [(0, 13)]
 
-        expected_events_true_extended = [(-1, 15)]
-
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=24)
 
         for actual, expected in zip(am.events_true, expected_events_true):
-            assert actual[0] == pytest.approx(expected[0])
-            assert actual[1] == pytest.approx(expected[1])
-
-        for actual, expected in zip(am.events_true_extended,
-                                    expected_events_true_extended):
             assert actual[0] == pytest.approx(expected[0])
             assert actual[1] == pytest.approx(expected[1])
 
@@ -311,22 +316,22 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0.4,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
                              event_maximum_duration=12)
 
         assert am.n_true_seizures == 6
-        assert am.event_tp == 3
-        assert am.event_fp == 2
-        assert am.event_sensitivity == pytest.approx(0.5, abs=0.0001)
-        assert am.event_precision == pytest.approx(0.6, abs=0.0001)
-        assert am.event_recall == pytest.approx(0.5, abs=0.0001)
-        assert am.event_f_score == pytest.approx(0.5455, abs=0.0001)
-        assert am.event_false_detections_per_hour == pytest.approx(114.29, abs=0.01)
-        assert am.event_false_detections_per_interictal_hour == pytest.approx(600, abs=0.01)
-        assert am.event_average_detection_delay == pytest.approx(1.3333, abs=0.0001)
+        assert am.event_tp == 2
+        assert am.event_fp == 4
+        assert am.event_sensitivity == pytest.approx(0.3333, abs=0.0001)
+        assert am.event_precision == pytest.approx(0.3333, abs=0.0001)
+        assert am.event_recall == pytest.approx(0.3333, abs=0.0001)
+        assert am.event_f_score == pytest.approx(0.3333, abs=0.0001)
+        assert am.event_false_detections_per_hour == pytest.approx(228.57, abs=0.01)
+        assert am.event_false_detections_per_interictal_hour == pytest.approx(533.33, abs=0.01)
+        assert am.event_average_detection_delay == pytest.approx(0.5, abs=0.0001)
 
     def test_y_true_all_zeros(self):
         """
@@ -338,7 +343,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -354,7 +359,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -370,7 +375,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -386,7 +391,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -436,7 +441,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0.4,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -446,7 +451,7 @@ class TestAccuracyMetrics:
                          "sample_offset": am.sample_offset,
                          "threshold_method": am.threshold_method,
                          "threshold": am.threshold,
-                         "event_minimum_overlap": am.event_minimum_overlap,
+                         "event_minimum_rel_overlap": am.event_minimum_rel_overlap,
                          "event_preictal_tolerance": am.event_preictal_tolerance,
                          "event_postictal_tolerance": am.event_postictal_tolerance,
                          "event_minimum_separation": am.event_minimum_separation,
@@ -499,7 +504,7 @@ class TestAccuracyMetrics:
 
         am = AccuracyMetrics(y_true, y_pred,
                              sample_duration=4, sample_offset=1,
-                             threshold=0.5, event_minimum_overlap=2,
+                             threshold=0.5, event_minimum_rel_overlap=0.4,
                              event_preictal_tolerance=1,
                              event_postictal_tolerance=2,
                              event_minimum_separation=2,
@@ -519,3 +524,36 @@ class TestAccuracyMetrics:
 
         y_true_flattened = y_true.flatten()
         am = AccuracyMetrics(y_true_flattened, y_true_flattened, 4, 2)
+
+    def test_event_metrics_two_pred_events_per_true_event(self):
+        """
+        If two detected events are found covering one true event, only one
+        TP is retained and the average detection delay only considers the
+        first detection.
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+        y_pred = np.array([0, 0, 1, 1, 1, 1, 0, 0, 0, 0,
+                           1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=4, sample_offset=1,
+                             threshold=0.5, event_minimum_rel_overlap=0.4,
+                             event_preictal_tolerance=1,
+                             event_postictal_tolerance=2,
+                             event_minimum_separation=2,
+                             event_maximum_duration=20)
+
+        assert am.n_true_seizures == 1
+        assert am.event_tp == 1
+        assert am.event_fp == 1
+        assert am.event_sensitivity == pytest.approx(1., abs=0.0001)
+        assert am.event_precision == pytest.approx(0.5, abs=0.0001)
+        assert am.event_recall == pytest.approx(1., abs=0.0001)
+        assert am.event_f_score == pytest.approx(0.6666, abs=0.0001)
+        assert am.event_false_detections_per_hour == pytest.approx(156.52,
+                                                                   abs=0.01)
+        assert am.event_false_detections_per_interictal_hour == pytest.approx(
+            400., abs=0.01)
+        assert am.event_average_detection_delay == pytest.approx(-1.,
+                                                                 abs=0.0001)
