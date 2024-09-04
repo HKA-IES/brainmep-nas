@@ -331,7 +331,7 @@ class TestAccuracyMetrics:
         assert am.event_f_score == pytest.approx(0.3333, abs=0.0001)
         assert am.event_false_detections_per_hour == pytest.approx(228.57, abs=0.01)
         assert am.event_false_detections_per_interictal_hour == pytest.approx(533.33, abs=0.01)
-        assert am.event_average_detection_delay == pytest.approx(1.5, abs=0.0001)
+        assert am.event_average_detection_delay == pytest.approx(0.5, abs=0.0001)
 
     def test_y_true_all_zeros(self):
         """
@@ -524,3 +524,36 @@ class TestAccuracyMetrics:
 
         y_true_flattened = y_true.flatten()
         am = AccuracyMetrics(y_true_flattened, y_true_flattened, 4, 2)
+
+    def test_event_metrics_two_pred_events_per_true_event(self):
+        """
+        If two detected events are found covering one true event, only one
+        TP is retained and the average detection delay only considers the
+        first detection.
+        """
+        y_true = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+                           1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+        y_pred = np.array([0, 0, 1, 1, 1, 1, 0, 0, 0, 0,
+                           1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+
+        am = AccuracyMetrics(y_true, y_pred,
+                             sample_duration=4, sample_offset=1,
+                             threshold=0.5, event_minimum_rel_overlap=0.4,
+                             event_preictal_tolerance=1,
+                             event_postictal_tolerance=2,
+                             event_minimum_separation=2,
+                             event_maximum_duration=20)
+
+        assert am.n_true_seizures == 1
+        assert am.event_tp == 1
+        assert am.event_fp == 1
+        assert am.event_sensitivity == pytest.approx(1., abs=0.0001)
+        assert am.event_precision == pytest.approx(0.5, abs=0.0001)
+        assert am.event_recall == pytest.approx(1., abs=0.0001)
+        assert am.event_f_score == pytest.approx(0.6666, abs=0.0001)
+        assert am.event_false_detections_per_hour == pytest.approx(156.52,
+                                                                   abs=0.01)
+        assert am.event_false_detections_per_interictal_hour == pytest.approx(
+            400., abs=0.01)
+        assert am.event_average_detection_delay == pytest.approx(-1.,
+                                                                 abs=0.0001)

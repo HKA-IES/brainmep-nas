@@ -516,6 +516,9 @@ class AccuracyMetrics:
                     detection_delay = np.max((-self.event_preictal_tolerance,
                                               pred_event[0] - true_event[0]))
                     detection_delays.append(detection_delay)
+                    # Break to consider only the first detected event for a
+                    # given true event.
+                    break
 
         if len(detection_delays) > 0:
             self.event_average_detection_delay = np.average(detection_delays)
