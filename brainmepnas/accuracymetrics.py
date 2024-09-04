@@ -35,7 +35,7 @@ class AccuracyMetrics:
     [1] J. Dan et al., “SzCORE: A Seizure Community Open-source Research
     Evaluation framework for the validation of EEG-based automated seizure
     detection algorithms.” arXiv, Feb. 23, 2024. Accessed: Feb. 27, 2024.
-    [Online]. Available: http://arxiv.org/abs/2402.13005
+    [Online]. Available: https://arxiv.org/abs/2402.13005
 
     Attributes
     ----------
@@ -362,26 +362,20 @@ class AccuracyMetrics:
             raise ValueError("event_maximum_duration must be > 0 seconds.")
         self.event_maximum_duration = event_maximum_duration
 
+        # Threshold-independent metrics
         self.n_samples = len(y_true)
         self.total_duration = ((self.n_samples - 1) * self.sample_offset +
                                self.sample_duration)
 
-        # ROC curve
         roc_fpr, roc_tpr, _ = sk_metrics.roc_curve(y_true, y_pred)
         self.sample_roc_auc = sk_metrics.auc(roc_fpr, roc_tpr)
 
-        # Precision-recall curve
         (prc_precision,
          prc_recall,
          prc_thresholds) = sk_metrics.precision_recall_curve(y_true, y_pred)
         self.sample_prc_auc = sk_metrics.auc(prc_recall, prc_precision)
 
-        f_scores = 2 * (prc_precision * prc_recall) / (
-                prc_precision + prc_recall)
-        nan_idx = np.argwhere(np.isnan(f_scores))
-        f_scores = np.delete(f_scores, nan_idx)
-        prc_thresholds = np.delete(prc_thresholds, nan_idx)
-
+        # Set threshold
         if threshold == "max_sample_f_score":
             self.threshold = self._get_threshold_max_sample_f_score(y_true,
                                                                     y_pred)
@@ -398,6 +392,7 @@ class AccuracyMetrics:
                              "and 1 or one of ['max_sample_f_score', "
                              "'max_event_f_score'].")
 
+        # Threshold-dependent metrics
         y_pred = np.where(y_pred >= self.threshold, 1, 0)
         self.y_pred_post_threshold = y_pred
 
@@ -429,8 +424,8 @@ class AccuracyMetrics:
             1D array of true labels. Expected values are either 0 (no seizure)
             or 1 (seizure).
         y_pred : np.ndarray(int)
-            1D array of predicted labels. Expected values are either 0 (no seizure)
-            or 1 (seizure).
+            1D array of predicted labels. Expected values are either 0 (no
+            seizure) or 1 (seizure).
         """
         (self.sample_tn,
          self.sample_fp,
@@ -462,8 +457,8 @@ class AccuracyMetrics:
             1D array of true labels. Expected values are either 0 (no seizure)
             or 1 (seizure).
         y_pred : np.ndarray(int)
-            1D array of predicted labels. Expected values are either 0 (no seizure)
-            or 1 (seizure).
+            1D array of predicted labels. Expected values are either 0 (no
+            seizure) or 1 (seizure).
         """
         label_duration = self.sample_offset
         kernel = np.ones(int(self.sample_duration / label_duration))
@@ -516,8 +511,10 @@ class AccuracyMetrics:
         detection_delays = list()
 
         for true_event in self.events_true_merged_split:
-            true_event_extended = (true_event[0] - self.event_preictal_tolerance,
-                                   true_event[1] + self.event_postictal_tolerance)
+            true_event_extended = (true_event[0] -
+                                   self.event_preictal_tolerance,
+                                   true_event[1] +
+                                   self.event_postictal_tolerance)
 
             for pred_event in self.events_pred_merged_split:
                 abs_overlap = (min(true_event_extended[1], pred_event[1]) -
@@ -551,8 +548,8 @@ class AccuracyMetrics:
             1D array of true labels. Expected values are either 0 (no seizure)
             or 1 (seizure).
         y_pred : np.ndarray(int)
-            1D array of predicted labels. Expected values are either 0 (no seizure)
-            or 1 (seizure).
+            1D array of predicted labels. Expected values are either 0 (no
+            seizure) or 1 (seizure).
         """
         (prc_precision,
          prc_recall,
@@ -564,7 +561,7 @@ class AccuracyMetrics:
         return float(prc_thresholds[np.argmax(f_scores)])
 
     def _get_threshold_max_event_f_score(self, y_true: np.ndarray,
-                                          y_pred: np.ndarray) -> float:
+                                         y_pred: np.ndarray) -> float:
         """
         Compute threshold value which maximizes event-based f-score.
 
@@ -574,8 +571,8 @@ class AccuracyMetrics:
             1D array of true labels. Expected values are either 0 (no seizure)
             or 1 (seizure).
         y_pred : np.ndarray(int)
-            1D array of predicted labels. Expected values are either 0 (no seizure)
-            or 1 (seizure).
+            1D array of predicted labels. Expected values are either 0 (no
+            seizure) or 1 (seizure).
         """
         threshold_values = np.unique(y_pred)
         event_f_scores = np.zeros_like(threshold_values)
