@@ -377,10 +377,11 @@ class AccuracyMetrics:
         prc_thresholds = np.delete(prc_thresholds, nan_idx)
 
         if threshold == "sample_max_f_score":
-            self.threshold = float(prc_thresholds[np.argmax(f_scores)])
+            self.threshold = self._get_threshold_sample_max_f_score(y_true,
+                                                                    y_pred)
             self.threshold_method = "sample_max_f_score"
         elif 0 <= float(threshold) <= 1:
-            self.threshold = threshold
+            self.threshold = float(threshold)
             self.threshold_method = "fixed"
         else:
             raise ValueError("threshold should be either a number between 0 "
@@ -526,3 +527,27 @@ class AccuracyMetrics:
             self.event_average_detection_delay = np.average(detection_delays)
         else:
             self.event_average_detection_delay = np.nan
+
+    @staticmethod
+    def _get_threshold_sample_max_f_score(y_true: np.ndarray,
+                                          y_pred: np.ndarray) -> float:
+        """
+        Compute threshold value which maximizes sample-based f-score.
+
+        Parameters
+        ----------
+        y_true : np.ndarray(int)
+            1D array of true labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        y_pred : np.ndarray(int)
+            1D array of predicted labels. Expected values are either 0 (no seizure)
+            or 1 (seizure).
+        """
+        (prc_precision,
+         prc_recall,
+         prc_thresholds) = sk_metrics.precision_recall_curve(y_true, y_pred)
+
+        f_scores = 2 * (prc_precision * prc_recall) / (
+                prc_precision + prc_recall)
+
+        return float(prc_thresholds[np.argmax(f_scores)])
