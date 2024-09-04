@@ -24,6 +24,7 @@ dependencies = [
     "click",
     "optuna",
     "codecarbon",
+    "timescoring",
 ]
 license = {file = "LICENSE"}
 
