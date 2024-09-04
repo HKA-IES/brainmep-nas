@@ -188,7 +188,8 @@ class AccuracyMetrics:
         associated true event (without considering the pre-ictal tolerance).
         The delay is positive if the prediction occurs after the true start,
         and negative if it occurs before the true start (in the pre-ictal
-        tolerance).
+        tolerance). If a detected event starts before the pre-ictal tolerance,
+        the detection delay is set to the pre-ictal tolerance.
 
     # TODO: Check for correct values in edge cases (i.e. TP or TN = 0, ...)
     """
@@ -446,58 +447,12 @@ class AccuracyMetrics:
         self.events_pred_merged_split = es.hyp.events
 
         self.n_true_seizures = es.refTrue
-
         self.event_tp = es.tp
-
-        # True positive if a predicted event partially overlaps with a true
-        # event.
-        #detection_delays = list()
-        #last_event_extended_end = 0
-        #total_ictal_duration = 0
-        #for true_event, true_event_extended in zip(self.events_true,
-        #                                           self.events_true_extended):
-        #    for pred_event in self.events_pred:
-        #        overlap = (min(true_event_extended[1], pred_event[1]) -
-        #                   max(true_event_extended[0], pred_event[0]))
-        #        if overlap >= event_minimum_overlap:
-        #            delay = pred_event[0] - true_event[0]
-        #            detection_delays.append(delay)
-        #
-        #    # Sum of ictal duration
-        #    # Note: We take into account potential overlap of extended events.
-        #    if true_event_extended[0] < last_event_extended_end:
-        #        total_ictal_duration += true_event_extended[1] - last_event_extended_end
-        #    else:
-        #        total_ictal_duration += true_event_extended[1] - true_event_extended[0]
-        #    last_event_extended_end = true_event_extended[1]
-        
-        #if len(detection_delays) > 0:
-        #    self.event_average_detection_delay = np.average(detection_delays)
-        #else:
-        #    self.event_average_detection_delay = np.nan
-
         self.event_fp = es.fp
-
-        # False positive if a predicted event does not overlap with a true
-        # event.
-        #self.event_fp = 0
-        #for pred_event in self.events_pred:
-        #    overlaps = list()
-        #    for true_event, true_event_extended in zip(self.events_true,
-        #                                               self.events_true_extended):
-        #        overlap = (min(true_event_extended[1], pred_event[1]) -
-        #                   max(true_event_extended[0], pred_event[0]))
-        #        overlaps.append(overlap)
-        #
-        #    # No positive overlaps means no true event associated to this
-        #    # predicted event.
-        #    if len(overlaps) > 0:
-        #        if max(overlaps) < event_minimum_overlap:
-        #            self.event_fp += 1
-
         self.event_sensitivity = es.sensitivity
         self.event_recall = self.event_sensitivity
 
+        # Calculate metrics not in EventScoring
         if self.event_tp == 0:                   
             self.event_precision = np.nan                                            
             self.event_f_score = np.nan
@@ -515,6 +470,29 @@ class AccuracyMetrics:
         self.event_false_detections_per_interictal_hour = ((self.event_fp / (total_duration -
                                                                              total_ictal_duration) * 3600))
 
+        # Average detection delay
+        detection_delays = list()
+
+        for true_event in self.events_true_merged_split:
+            true_event_extended = (true_event[0]-event_preictal_tolerance,
+                                   true_event[1]+event_postictal_tolerance)
+
+            for pred_event in self.events_pred_merged_split:
+                abs_overlap = (min(true_event_extended[1], pred_event[1]) -
+                               max(true_event_extended[0], pred_event[0]))
+                rel_overlap = (abs_overlap /
+                               (true_event_extended[1] - true_event_extended[0]))
+
+                if rel_overlap > event_minimum_rel_overlap + 1e-6:
+                    detection_delay = np.max((event_preictal_tolerance,
+                                              pred_event[0]-true_event[0]))
+                    detection_delays.append(detection_delay)
+
+        if len(detection_delays) > 0:
+            self.event_average_detection_delay = np.average(detection_delays)
+        else:
+            self.event_average_detection_delay = np.nan
+
     def as_dict(self) -> dict:
         """
         Returns all non-iterable attributes in a dictionary with attribute
@@ -529,128 +507,3 @@ class AccuracyMetrics:
                 d[field.name] = field_value
 
         return d
-
-    @staticmethod
-    def _get_events(y: np.ndarray,
-                    sample_duration: float, sample_offset: float,
-                    event_minimum_separation: float,
-                    event_maximum_duration: float) -> List[Tuple[float, float]]:
-        """
-        From a given binary array where 1 represent a sample with seizure
-        detection, create a list of (start, end) tuples for every seizure
-        event.
-
-        The code is adapted from
-        https://github.com/esl-epfl/sz-validation-framework.
-
-        Parameters
-        ----------
-        y : np.ndarray
-            Array of seizure labels. Expected values are either 0 (no seizure)
-            or 1 (seizure).
-        sample_duration : float
-            Duration of a sample (label) in seconds.
-        sample_offset : float 
-            Duration between the start of two consecutive samples in seconds.
-        event_minimum_separation : float
-            Events that are separated by less than event_minimum_separation
-            seconds are merged.
-        event_maximum_duration : float 
-            Events that are longer than event_maximum_duration seconds 
-            are split in events with the maximum duration. This is done 
-            after the merging of close events (see event_minimum_separation).
-
-        Returns
-        -------
-        events : List[Tuple[float, float]]
-            List of events, where each event is represented by a tuple
-            (start_time, end_time), in seconds from the beginning of y.
-        """
-        # Adapted from
-        # https://github.com/esl-epfl/sz-validation-framework/blob/main/timescoring/annotations.py
-        events = list()
-        tmpEnd = []
-        start_i = np.where(np.diff(np.array(y, dtype=int)) == 1)[0]
-        end_i = np.where(np.diff(np.array(y, dtype=int)) == -1)[0]
-
-        # No transitions and first sample is positive -> event is duration of
-        # file
-        if len(start_i) == 0 and len(end_i) == 0 and y[0]:
-            events.append((0,
-                           ((len(y) - 1) * sample_offset) + sample_duration))
-        else:
-            # Edge effect - First sample is an event
-            if y[0]:
-                events.append(
-                    (0, (end_i[0] * sample_offset) + sample_duration))
-                end_i = np.delete(end_i, 0)
-
-            # Edge effect - Last event runs until end of file
-            if y[-1]:
-                if len(start_i):
-                    tmpEnd = [((start_i[-1] + 1) * sample_offset,
-                               ((len(y) - 1) * sample_offset) + sample_duration)]
-                    start_i = np.delete(start_i, len(start_i) - 1)
-
-            # Add all events
-            start_i += 1
-            end_i += 1
-            for i in range(len(start_i)):
-                events.append((start_i[i] * sample_offset,
-                               ((end_i[i] - 1) * sample_offset) + sample_duration))
-            events += tmpEnd  # add potential end edge effect
-
-        # Merge close events
-        merged_events = events.copy()
-        i = 1
-        while i < len(merged_events):
-            event = merged_events[i]
-            if event[0] - merged_events[i - 1][1] < event_minimum_separation:
-                merged_events[i - 1] = (merged_events[i - 1][0], event[1])
-                del merged_events[i]
-                i -= 1
-            i += 1
-
-        # Split long events
-        shorter_events = merged_events.copy()
-
-        for i, event in enumerate(shorter_events):
-            if event[1] - event[0] > event_maximum_duration:
-                shorter_events[i] = (event[0],
-                                     event[0] + event_maximum_duration)
-                shorter_events.insert(i + 1,
-                                      (event[0] + event_maximum_duration,
-                                       event[1]))
-
-        return shorter_events
-
-    @staticmethod
-    def _extend_events(events: List[Tuple[float, float]],
-                       preictal: float,
-                       postictal: float) -> List[Tuple[float, float]]:
-        """
-        Extend events in the pre- and post-ictal directions.
-
-        The code is adapted from https://github.com/esl-epfl/sz-validation-framework.
-
-        Parameters
-        ----------
-        events : List[Tuple[float, float]]
-            List of events returned by _get_events().
-        preictal : float
-            Time to extend before each event, in seconds.
-        postictal : float
-            Time to extend after each event, in seconds.
-
-        Returns
-        -------
-        extended_events : List[Tuple[float, float]]
-            List of extended events, where each event is represented by a tuple
-            (start_time, end_time), in seconds from the beginning of y.
-        """
-        extended_events = events.copy()
-
-        for i, event in enumerate(extended_events):
-            extended_events[i] = (event[0] - preictal, event[1] + postictal)
-
-        return extended_events

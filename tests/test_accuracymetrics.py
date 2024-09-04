@@ -331,7 +331,7 @@ class TestAccuracyMetrics:
         assert am.event_f_score == pytest.approx(0.3333, abs=0.0001)
         assert am.event_false_detections_per_hour == pytest.approx(228.57, abs=0.01)
         assert am.event_false_detections_per_interictal_hour == pytest.approx(533.33, abs=0.01)
-        assert am.event_average_detection_delay == pytest.approx(1.3333, abs=0.0001)
+        assert am.event_average_detection_delay == pytest.approx(1.5, abs=0.0001)
 
     def test_y_true_all_zeros(self):
         """
