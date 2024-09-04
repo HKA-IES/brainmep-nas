@@ -513,7 +513,7 @@ class AccuracyMetrics:
                                    0]))
 
                 if rel_overlap > self.event_minimum_rel_overlap + 1e-6:
-                    detection_delay = np.max((self.event_preictal_tolerance,
+                    detection_delay = np.max((-self.event_preictal_tolerance,
                                               pred_event[0] - true_event[0]))
                     detection_delays.append(detection_delay)
 
