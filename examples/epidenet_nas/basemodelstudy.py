@@ -221,7 +221,17 @@ class BaseModelStudy(AbstractModelStudy):
                   batch_size=256, validation_split=0.2,
                   epochs=max_epochs, shuffle=False)
 
+        # Calculate ideal threshold on the training data
+        # This is done to avoid "cheating" by setting the threshold using the
+        # test data.
+        train_y_predicted = model.predict(train_data[0])
+        am_train = AccuracyMetrics(train_data[1].flatten(),
+                                   train_y_predicted.flatten(),
+                                   4, 2, threshold="max_sample_f_score")
+        threshold = am_train.threshold
+
         del train_data
+        del am_train
 
         # Test model
         test_data = dataset.get_data({"5": test_seizures},
@@ -229,7 +239,7 @@ class BaseModelStudy(AbstractModelStudy):
         test_y_predicted = model.predict(test_data[0])
         am = AccuracyMetrics(test_data[1].flatten(),
                              test_y_predicted.flatten(),
-                             4, 2, threshold="max_f_score")
+                             4, 2, threshold=threshold)
 
         return am
 
