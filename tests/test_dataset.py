@@ -92,7 +92,7 @@ class TestDataset:
         assert dataset.data_shape == (self.WINDOW_SIZE, self.NB_CHANNELS)
 
     def test_get_data_all_patients(self, dataset):
-        train_x, train_y = dataset.get_data("all", set="train")
+        train_x, train_y = dataset.get_data("all", set_="train")
 
         total_nb_windows = np.sum([val["nb_windows_per_record"] * val["nb_records"]
                                    for val in self.PATIENTS.values()])
@@ -103,7 +103,7 @@ class TestDataset:
         assert train_y.shape == expected_train_y_shape
 
     def test_get_data_one_patient(self, dataset):
-        train_x, train_y = dataset.get_data({"1": "all"}, set="train")
+        train_x, train_y = dataset.get_data({"1": "all"}, set_="train")
 
         total_nb_windows = (self.PATIENTS["1"]["nb_windows_per_record"] *
                             self.PATIENTS["1"]["nb_records"])
@@ -115,7 +115,7 @@ class TestDataset:
 
     def test_get_data_all_patients_one_record(self, dataset):
         train_x, train_y = dataset.get_data({"1": [0], "2": [0]},
-                                            set="train")
+                                            set_="train")
         total_nb_windows = (self.PATIENTS["1"]["nb_windows_per_record"] +
                             self.PATIENTS["2"]["nb_windows_per_record"])
         expected_train_x_shape = (total_nb_windows, self.WINDOW_SIZE, self.NB_CHANNELS)
@@ -126,16 +126,16 @@ class TestDataset:
 
     def test_get_data_bad_patient(self, dataset):
         with pytest.raises(ValueError):
-            _, _ = dataset.get_data({"450": "all"}, set="train")
+            _, _ = dataset.get_data({"450": "all"}, set_="train")
 
     def test_get_data_bad_record(self, dataset):
         with pytest.raises(ValueError):
-            _, _ = dataset.get_data({"1": [450]}, set="train")
+            _, _ = dataset.get_data({"1": [450]}, set_="train")
 
     def test_get_data_shuffle(self, dataset):
-        train_x, train_y = dataset.get_data({"1": "all"}, set="train")
+        train_x, train_y = dataset.get_data({"1": "all"}, set_="train")
         shuffled_train_x, shuffled_train_y = dataset.get_data({"1": "all"},
-                                                              set="train",
+                                                              set_="train",
                                                               shuffle=True)
 
         with pytest.raises(AssertionError):
@@ -143,7 +143,7 @@ class TestDataset:
             np.testing.assert_array_equal(shuffled_train_y, train_y)
 
     def test_get_data_test(self, dataset):
-        test_x, test_y = dataset.get_data("all", set="test")
+        test_x, test_y = dataset.get_data("all", set_="test")
 
         total_nb_windows = np.sum([val["nb_windows_per_record"] * val["nb_records"]
              for val in self.PATIENTS.values()])

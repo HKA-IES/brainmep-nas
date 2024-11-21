@@ -261,7 +261,7 @@ class AccuracyMetrics:
         [1] J. Dan et al., “SzCORE: A Seizure Community Open-source Research
         Evaluation framework for the validation of EEG-based automated seizure
         detection algorithms.” arXiv, Feb. 23, 2024. Accessed: Feb. 27, 2024.
-        [Online]. Available: http://arxiv.org/abs/2402.13005
+        [Online]. Available: https://arxiv.org/abs/2402.13005
 
         Parameters                                                                                                  
         ----------
@@ -504,8 +504,8 @@ class AccuracyMetrics:
 
         total_ictal_duration = np.sum(mask_true) * label_duration
         self.event_false_detections_per_interictal_hour = (
-        (self.event_fp / (total_duration -
-                          total_ictal_duration) * 3600))
+            (self.event_fp / (total_duration -
+                              total_ictal_duration) * 3600))
 
         # Average detection delay
         detection_delays = list()

@@ -21,4 +21,3 @@ class GPUModelStudy(BaseModelStudy):
 
 if __name__ == "__main__":
     GPUModelStudy.cli_entry_point()
-

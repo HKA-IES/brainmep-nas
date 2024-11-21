@@ -65,7 +65,8 @@ class Dataset:
             self._train_records[patient] = val["train_records"]
             self._test_records[patient] = val["test_records"]
             self._patients.append(patient)
-            self._nb_records_per_patient[patient] = len(self._train_records[patient])
+            self._nb_records_per_patient[patient] = len(
+                self._train_records[patient])
 
         sample_data_file_path = (self._directory /
                                  self._train_records[self.patients[0]][0])
@@ -74,8 +75,9 @@ class Dataset:
         self._window_size = self._data_shape[0]
         self._nb_channels = self._data_shape[1]
 
-    def get_data(self, patients_records: Union[str, Dict[str, Union[str, List[int]]]],
-                 set: Literal["train", "test"], shuffle: bool = False,
+    def get_data(self,
+                 patients_records: Union[str, Dict[str, Union[str, List[int]]]],
+                 set_: Literal["train", "test"], shuffle: bool = False,
                  shuffle_seed: int = 42) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns the train or test data and labels for the desired
@@ -93,7 +95,7 @@ class Dataset:
                 patient "2"
                     patients_records = {"1": "all",
                                         "2": [0, 1]}
-        set: Literal["train", "test"]
+        set_: Literal["train", "test"]
             Get train or test data.
         shuffle: bool
             set to True if data should be shuffled.
@@ -110,12 +112,12 @@ class Dataset:
         if patients_records == "all":
             patients_records = {p: "all" for p in self.patients}
 
-        if set == "train":
+        if set_ == "train":
             records_list = self._train_records
-        elif set == "test":
+        elif set_ == "test":
             records_list = self._test_records
         else:
-            raise ValueError(f"Unsupported set={set}. "
+            raise ValueError(f"Unsupported set={set_}. "
                              f"Should be either train or test.")
 
         x_list = list()
@@ -355,7 +357,7 @@ def create_new_dataset(directory: Union[str, pathlib.Path],
 
 def add_record_to_dataset(directory: Union[str, pathlib.Path],
                           patient: str,
-                          set: Literal["train", "test"],
+                          set_: Literal["train", "test"],
                           arr_x: np.ndarray,
                           arr_y: np.ndarray):
     """
@@ -367,7 +369,7 @@ def add_record_to_dataset(directory: Union[str, pathlib.Path],
         Path to directory of existing dataset.
     patient: str
         Patient id.
-    set: Literal["train", "test"]
+    set_: Literal["train", "test"]
         Get train or test data.
     arr_x: np.ndarray
         Array of x (input) data.
@@ -378,9 +380,9 @@ def add_record_to_dataset(directory: Union[str, pathlib.Path],
         directory = pathlib.Path(directory)
 
     # Check validity of type
-    if set not in ["train", "test"]:
+    if set_ not in ["train", "test"]:
         raise ValueError(
-            f"Invalid type={set}, should be either test or train.")
+            f"Invalid type={set_}, should be either test or train.")
 
     # Load Dataset properties
     properties_file_path = directory / "properties.json"
@@ -395,13 +397,13 @@ def add_record_to_dataset(directory: Union[str, pathlib.Path],
         os.mkdir(patient_dir)
 
     # Save data
-    new_seizure_id = len(properties["patients"][patient][f"{set}_records"])
-    output_file_path = patient_dir / f"{set}_record{new_seizure_id}.npz"
+    new_seizure_id = len(properties["patients"][patient][f"{set_}_records"])
+    output_file_path = patient_dir / f"{set_}_record{new_seizure_id}.npz"
     np.savez(output_file_path, x=arr_x, y=arr_y)
 
     # Add file path to properties
     output_file_path_as_str = str(output_file_path.relative_to(directory))
-    properties["patients"][patient][f"{set}_records"].append(
+    properties["patients"][patient][f"{set_}_records"].append(
         output_file_path_as_str)
 
     # Save updated properties

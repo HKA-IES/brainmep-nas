@@ -21,4 +21,3 @@ class CPUModelStudy(BaseModelStudy):
 
 if __name__ == "__main__":
     CPUModelStudy.cli_entry_point()
-

@@ -59,8 +59,6 @@ class MltkHardwareMetrics(HardwareMetrics):
         Multiply-accumulate operations per second, in 1/seconds (1/s).
     inference_per_sec: float
         Number of inferences per second, in 1/seconds (1/s).
-    profiling_results: mltk.core.ProfilingModelResults
-        Results object from the MLTK profiler.
     """
 
     clock_frequency: float
@@ -96,10 +94,10 @@ class MltkHardwareMetrics(HardwareMetrics):
             Path to .tflite file.
         """
         profiling_results = profile_model(tflite_model_path,
-                                               accelerator="MVP",
-                                               return_estimates=True)
+                                          accelerator="MVP",
+                                          return_estimates=True)
         summary = profiling_results.get_summary(exclude_null=False,
-                                                     full_summary=True)
+                                                full_summary=True)
 
         self.inference_time = summary["time"]
         self.inference_energy = summary["energy"]

@@ -4,7 +4,7 @@
 import dataclasses
 import pathlib
 import warnings
-from typing import Optional, Union
+from typing import Union
 
 # import third-party modules
 import numpy as np
@@ -102,23 +102,26 @@ class TestbenchHardwareMetrics(HardwareMetrics):
         #   These logs are stored in mcu_iostream_parsed.csv
         energy_measurement_log_path = output_dir / "mcu_iostream_parsed.csv"
         df_mcu_iostream = pd.read_csv(energy_measurement_log_path)
-        expected_execution_time = df_mcu_iostream[df_mcu_iostream["layer_name"] == "ALL"][
-            "execution_time"].mean()
+        df_mcu_iostream_ALL = df_mcu_iostream[
+            df_mcu_iostream["layer_name"] == "ALL"]
+        expected_execution_time = df_mcu_iostream_ALL["execution_time"].mean()
 
         # We expect real measured durations to be within +- 10% of
         # expected_execution_time.
         idx_to_ignore = []
-        for id, duration in enumerate(nnresults.total_duration):
+        for idx, duration in enumerate(nnresults.total_duration):
             if not 0.9 * expected_execution_time < duration < 1.1 * expected_execution_time:
-                idx_to_ignore.append(id)
+                idx_to_ignore.append(idx)
         if len(idx_to_ignore) == nnresults.nb_repetitions:
             raise RuntimeError("All iterations were excluded.")
         elif len(idx_to_ignore) > 0:
             warnings.warn(f"{len(idx_to_ignore)} iterations were excluded "
                           f"due to unexpectedly long or short inference time.")
 
-        energy_values_subset = np.delete(nnresults.total_energy, idx_to_ignore)
-        duration_values_subset = np.delete(nnresults.total_duration, idx_to_ignore)
+        energy_values_subset = np.delete(nnresults.total_energy,
+                                         idx_to_ignore)
+        duration_values_subset = np.delete(nnresults.total_duration,
+                                           idx_to_ignore)
 
         self.inference_energy = np.mean(energy_values_subset)
         self.inference_time = np.mean(duration_values_subset)

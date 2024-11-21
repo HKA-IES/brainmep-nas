@@ -11,7 +11,7 @@ import numpy as np
 
 # import your own module
 from brainmepnas import (AbstractModelStudy, HardwareMetrics, AccuracyMetrics,
-                            CombinedMetrics, Dataset)
+                         CombinedMetrics, Dataset)
 
 
 class BaseModelStudy(AbstractModelStudy):
@@ -229,7 +229,7 @@ class BaseModelStudy(AbstractModelStudy):
         test_y_predicted = model.predict(test_data[0])
         am = AccuracyMetrics(test_data[1].flatten(),
                              test_y_predicted.flatten(),
-                             4, 2, threshold="max_f_score")
+                             4, 2, threshold="max_sample_f_score")
 
         return am
 

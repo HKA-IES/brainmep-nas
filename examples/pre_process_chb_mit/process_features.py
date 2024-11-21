@@ -4,7 +4,6 @@
 import logging
 import time
 import pathlib
-from typing import Tuple
 
 # import third-party modules
 import mne
@@ -20,9 +19,11 @@ from brainmepnas.dataset import create_new_dataset, add_record_to_dataset
 # Fixed parameters
 SAMPLING_FREQUENCY = 256
 
+
 @click.command()
 @click.option("-i", "--time_series_dataset_dir",
-              type=click.Path(exists=True, dir_okay=True, path_type=pathlib.Path),
+              type=click.Path(exists=True, dir_okay=True,
+                              path_type=pathlib.Path),
               required=True,
               help="Path to directory of time series dataset "
                    "(created with process_time_series.py).")
@@ -30,7 +31,8 @@ SAMPLING_FREQUENCY = 256
               type=click.Path(dir_okay=True, path_type=pathlib.Path),
               required=True,
               help="Path to output directory.")
-def process_features(time_series_dataset_dir: pathlib.Path, output_dir: pathlib.Path):
+def process_features(time_series_dataset_dir: pathlib.Path,
+                     output_dir: pathlib.Path):
     """
     Pre-process CHB-MIT Scalp EEG data and format the output time series as a
     Dataset.
@@ -84,10 +86,12 @@ def process_features(time_series_dataset_dir: pathlib.Path, output_dir: pathlib.
                                   features_arr, labels_arr)
 
         patient_duration = time.time() - patient_start_time
-        logging.info(f"Pre-processed records from patient {p} in {patient_duration} s.")
+        logging.info(f"Pre-processed records from patient {p} "
+                     f"in {patient_duration} s.")
 
     duration = time.time() - start_time
-    logging.info(f"Completed processing of features data in {duration} seconds.")
+    logging.info(f"Completed processing of features data "
+                 f"in {duration} seconds.")
 
 
 def _get_features(arr: np.ndarray, sampling_freq: float) -> np.ndarray:
@@ -139,7 +143,8 @@ def _get_features(arr: np.ndarray, sampling_freq: float) -> np.ndarray:
     lowfreq_band_st = _find_nearest(f, 3)[0]
     lowfreq_band_end = _find_nearest(f, 12)[0]
     lowfreq_band_power = power[:, lowfreq_band_st:lowfreq_band_end + 1].sum(axis=1)
-    lowfreq_band_power = np.where(lowfreq_band_power == 0, 1e-15, lowfreq_band_power)
+    lowfreq_band_power = np.where(lowfreq_band_power == 0, 1e-15,
+                                  lowfreq_band_power)
     epi_index = (beta_band_power + gamma_band_power) / lowfreq_band_power
 
     features[:, 9] = theta_band_power

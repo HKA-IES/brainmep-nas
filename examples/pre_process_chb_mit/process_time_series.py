@@ -21,9 +21,11 @@ TRAIN_WINDOW_OFFSET = 4    # seconds
 TEST_WINDOW_OFFSET = 2     # seconds
 CHANNELS = ["F7-T7", "T7-P7", "F8-T8", "T8-P8-0"]
 
+
 @click.command()
 @click.option("-i", "--raw_data_dir",
-              type=click.Path(exists=True, dir_okay=True, path_type=pathlib.Path),
+              type=click.Path(exists=True, dir_okay=True,
+                              path_type=pathlib.Path),
               required=True,
               help="Path to raw data directory.")
 @click.option("-o", "--output_dir",
@@ -78,13 +80,15 @@ def process_time_series(raw_data_dir: pathlib.Path, output_dir: pathlib.Path):
                 edf = edf.pick(CHANNELS)
             except ValueError:
                 # Expected channels are not (all) present. Skip this record.
-                logging.warning(f"Record {record_path}: all expected channels are not present. Skipping this record.")
+                logging.warning(f"Record {record_path}: all expected channels "
+                                f"are not present. Skipping this record.")
                 continue
 
             # Pre-load raw-data to accelerator pre-processing
             edf.load_data()
 
-            annotations = _get_annotations(raw_data_dir / (record_path + ".seizures"))
+            annotations = _get_annotations(raw_data_dir /
+                                           (record_path + ".seizures"))
             edf.set_annotations(annotations)
 
             # Butterworth filter, order 5, 0.5 Hz to 50 Hz
@@ -95,26 +99,30 @@ def process_time_series(raw_data_dir: pathlib.Path, output_dir: pathlib.Path):
             # Training set
             logging.info("\tPreparing training set.")
             train_window_overlap = WINDOW_DURATION - TRAIN_WINDOW_OFFSET
-            train_input, train_labels = _get_processed_arrays(edf,
-                                      WINDOW_DURATION,
-                                      train_window_overlap)
+            (train_input,
+             train_labels) = _get_processed_arrays(edf,
+                                                   WINDOW_DURATION,
+                                                   train_window_overlap)
             add_record_to_dataset(output_dir, str(p), "train",
                                   train_input, train_labels)
 
             # Prepare test set
             logging.info("\tPreparing test set.")
             test_window_overlap = WINDOW_DURATION - TEST_WINDOW_OFFSET
-            test_input, test_labels = _get_processed_arrays(edf,
-                                                            WINDOW_DURATION,
-                                                            test_window_overlap)
+            (test_input,
+             test_labels) = _get_processed_arrays(edf,
+                                                  WINDOW_DURATION,
+                                                  test_window_overlap)
             add_record_to_dataset(output_dir, str(p), "test",
                                   test_input, test_labels)
 
         patient_duration = time.time() - patient_start_time
-        logging.info(f"Pre-processed records from patient {p} in {patient_duration} s.")
+        logging.info(f"Pre-processed records from patient {p} "
+                     f"in {patient_duration} s.")
 
     duration = time.time() - start_time
-    logging.info(f"Completed processing of time series data in {duration} seconds.")
+    logging.info(f"Completed processing of time series data "
+                 f"in {duration} seconds.")
 
 
 def _get_records_with_seizures(records_with_seizures_file_path: pathlib.Path) -> dict:
@@ -148,6 +156,7 @@ def _get_records_with_seizures(records_with_seizures_file_path: pathlib.Path) ->
             except KeyError:
                 records_with_seizures[int(line[3:5])] = [line]
     return records_with_seizures
+
 
 def _get_annotations(annotations_path: pathlib.Path) -> mne.Annotations:
     """
@@ -184,6 +193,7 @@ def _get_annotations(annotations_path: pathlib.Path) -> mne.Annotations:
             i += 16
     return mne.Annotations(start_times[1:], durations[1:], "ictal")
 
+
 def _get_processed_arrays(edf,
                           window_length: float,
                           window_overlap: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -208,8 +218,8 @@ def _get_processed_arrays(edf,
         Array of windowed labels, with 0 for interictal and 1 for ictal.
     """
     epochs = mne.make_fixed_length_epochs(edf,
-                                                duration=window_length,
-                                                overlap=window_overlap)
+                                          duration=window_length,
+                                          overlap=window_overlap)
     x = np.array(epochs.get_data(), dtype=np.float16)
 
     scaler = mne.decoding.Scaler(scalings="mean")
@@ -219,7 +229,7 @@ def _get_processed_arrays(edf,
     x_scaled = np.swapaxes(x_scaled, 1, 2)
 
     y = np.zeros((x_scaled.shape[0], 1),
-                            dtype=np.float16)
+                 dtype=np.float16)
 
     nb_epochs_ictal = 0
     for i, annotations in enumerate(epochs.get_annotations_per_epoch()):
@@ -232,6 +242,7 @@ def _get_processed_arrays(edf,
                  f"are ictal")
 
     return x_scaled, y
+
 
 if __name__ == '__main__':
     process_time_series()

@@ -69,10 +69,11 @@ def generate_tflite_model(keras_model: tf.keras.Model,
         def representative_dataset():
             for x in representative_input:
                 yield [np.expand_dims(x, axis=[0, 3]).astype(
-                np.float32)]
+                    np.float32)]
 
     # Bug: tensorflow 2.16.1
-    # converter.convert() raises AttributeError, see https://github.com/tensorflow/tensorflow/issues/63867
+    # converter.convert() raises AttributeError, see
+    # https://github.com/tensorflow/tensorflow/issues/63867
     # Fix is to use save model.
     # converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
     with tempfile.TemporaryDirectory() as tmp_dir:
